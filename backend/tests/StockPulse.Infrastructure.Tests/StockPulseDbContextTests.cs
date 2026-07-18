@@ -7,6 +7,15 @@ namespace StockPulse.Infrastructure.Tests;
 public sealed class StockPulseDbContextTests
 {
     [Fact]
+    public void GetConnectionStringRejectsNonTestDatabase()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            TestDatabaseConnection.GetConnectionString("Host=localhost;Database=stockpulse"));
+
+        Assert.Contains("stockpulse_test", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StockNewsTickerOwnershipUsesNewsIdAsForeignKey()
     {
         var options = new DbContextOptionsBuilder<StockPulseDbContext>()
@@ -24,8 +33,8 @@ public sealed class StockPulseDbContextTests
     [Fact]
     public async Task DatabaseSchemaEnforcesUniqueWatchlistTicker()
     {
-        var connectionString = Environment.GetEnvironmentVariable("STOCKPULSE_TEST_CONNECTION");
-        Assert.False(string.IsNullOrWhiteSpace(connectionString));
+        var connectionString = TestDatabaseConnection.GetConnectionString(
+            Environment.GetEnvironmentVariable("STOCKPULSE_TEST_CONNECTION"));
         var options = new DbContextOptionsBuilder<StockPulseDbContext>().UseNpgsql(connectionString).Options;
         await using var db = new StockPulseDbContext(options);
         await db.Database.EnsureDeletedAsync();
