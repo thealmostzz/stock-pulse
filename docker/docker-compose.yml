@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: stockpulse-postgres
+    environment:
+      POSTGRES_DB: stockpulse
+      POSTGRES_USER: stockpulse
+      POSTGRES_PASSWORD: stockpulse_local_only
+    ports:
+      - "5432:5432"
+    volumes:
+      - stockpulse_postgres:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stockpulse -d stockpulse"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  stockpulse_postgres:
