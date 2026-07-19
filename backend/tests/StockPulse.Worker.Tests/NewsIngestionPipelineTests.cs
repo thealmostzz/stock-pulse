@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using StockPulse.Application.DTOs;
 using StockPulse.Contracts.News;
+using StockPulse.Domain.Entities;
 using StockPulse.Infrastructure.Persistence;
 using StockPulse.Worker.Pipelines;
 using StockPulse.Worker.Services;
@@ -27,6 +28,36 @@ public sealed class NewsIngestionPipelineTests
             "mock");
 
         Assert.Equal(first, second);
+    }
+
+    [Fact]
+    public void Model_HasUniqueOutboxNewsIdAndUniqueSourceCode()
+    {
+        using var db = CreateDbContext();
+        var outboxEvent = db.Model.FindEntityType(typeof(NewsOutboxEvent));
+        var newsSource = db.Model.FindEntityType(typeof(NewsSource));
+
+        Assert.NotNull(outboxEvent);
+        Assert.NotNull(newsSource);
+        Assert.True(outboxEvent
+            .GetIndexes()
+            .Single(index => index.Properties.Count == 1 &&
+                index.Properties[0].Name == nameof(NewsOutboxEvent.NewsId))
+            .IsUnique);
+        Assert.True(newsSource
+            .GetIndexes()
+            .Single(index => index.Properties.Count == 1 &&
+                index.Properties[0].Name == nameof(NewsSource.SourceCode))
+            .IsUnique);
+    }
+
+    [Fact]
+    public void TestDatabaseConnection_RejectsNonTestDatabase()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ValidateTestDatabaseConnection("Host=localhost;Database=stockpulse"));
+
+        Assert.Contains("stockpulse_test", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -79,6 +110,14 @@ public sealed class NewsIngestionPipelineTests
             ["NVDA"],
             JsonDocument.Parse("{}"));
 
+    private static StockPulseDbContext CreateDbContext()
+    {
+        var options = new DbContextOptionsBuilder<StockPulseDbContext>()
+            .UseNpgsql(GetDatabaseConnectionString())
+            .Options;
+        return new StockPulseDbContext(options);
+    }
+
     private static async Task CreateSchemaAsync(string schemaName)
     {
         await using var connection = new NpgsqlConnection(GetDatabaseConnectionString());
@@ -96,7 +135,23 @@ public sealed class NewsIngestionPipelineTests
     }
 
     private static string GetDatabaseConnectionString() =>
-        "Host=localhost;Port=5432;Database=stockpulse;Username=stockpulse;Password=stockpulse_local_only";
+        ValidateTestDatabaseConnection(Environment.GetEnvironmentVariable("STOCKPULSE_TEST_CONNECTION"));
+
+    private static string ValidateTestDatabaseConnection(string? connectionString)
+    {
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException("Set STOCKPULSE_TEST_CONNECTION before running integration tests.");
+        }
+
+        var builder = new NpgsqlConnectionStringBuilder(connectionString);
+        if (!string.Equals(builder.Database, "stockpulse_test", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("STOCKPULSE_TEST_CONNECTION must target the stockpulse_test database.");
+        }
+
+        return builder.ConnectionString;
+    }
 
     private sealed class RecordingNotifier : INewsCreatedNotifier
     {

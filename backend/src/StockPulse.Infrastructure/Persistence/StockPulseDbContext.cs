@@ -8,10 +8,12 @@ public sealed class StockPulseDbContext(DbContextOptions<StockPulseDbContext> op
     public DbSet<NewsSource> NewsSources => Set<NewsSource>();
     public DbSet<StockNews> StockNews => Set<StockNews>();
     public DbSet<StockNewsTicker> StockNewsTickers => Set<StockNewsTicker>();
+    public DbSet<NewsOutboxEvent> NewsOutboxEvents => Set<NewsOutboxEvent>();
     public DbSet<WatchlistItem> WatchlistItems => Set<WatchlistItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(StockPulseDbContext).Assembly);
+        modelBuilder.Entity<NewsSource>().HasIndex(source => source.SourceCode).IsUnique();
     }
 }
