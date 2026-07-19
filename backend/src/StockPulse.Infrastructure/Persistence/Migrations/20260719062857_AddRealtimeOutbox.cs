@@ -36,6 +36,22 @@ namespace StockPulse.Infrastructure.Persistence.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.Sql(
+                """
+                DO $$
+                BEGIN
+                    IF EXISTS (
+                        SELECT 1
+                        FROM "NewsSources"
+                        WHERE "SourceCode" IS NOT NULL
+                        GROUP BY "SourceCode"
+                        HAVING COUNT(*) > 1
+                    ) THEN
+                        RAISE EXCEPTION 'Cannot create unique index IX_NewsSources_SourceCode because duplicate non-null SourceCode values exist. Resolve or rename duplicate source codes, then rerun the migration.';
+                    END IF;
+                END $$;
+                """);
+
             migrationBuilder.CreateIndex(
                 name: "IX_NewsSources_SourceCode",
                 table: "NewsSources",

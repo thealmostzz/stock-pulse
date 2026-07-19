@@ -1,10 +1,13 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using Npgsql;
 using StockPulse.Application.DTOs;
 using StockPulse.Contracts.News;
 using StockPulse.Domain.Entities;
 using StockPulse.Infrastructure.Persistence;
+using StockPulse.Infrastructure.Persistence.Migrations;
 using StockPulse.Worker.Pipelines;
 using StockPulse.Worker.Services;
 
@@ -58,6 +61,28 @@ public sealed class NewsIngestionPipelineTests
             ValidateTestDatabaseConnection("Host=localhost;Database=stockpulse"));
 
         Assert.Contains("stockpulse_test", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AddRealtimeOutboxMigration_PreflightsDuplicateSourceCodesBeforeUniqueIndex()
+    {
+        var migration = new TestAddRealtimeOutboxMigration();
+        var operations = migration.GetUpOperations();
+        var preflight = operations
+            .Select((operation, index) => new { operation, index })
+            .Single(item => item.operation is SqlOperation sqlOperation &&
+                sqlOperation.Sql.Contains("duplicate non-null SourceCode", StringComparison.Ordinal));
+        var preflightSql = Assert.IsType<SqlOperation>(preflight.operation).Sql;
+        var uniqueIndexPosition = operations
+            .Select((operation, index) => new { operation, index })
+            .Single(item => item.operation is CreateIndexOperation createIndexOperation &&
+                createIndexOperation.Name == "IX_NewsSources_SourceCode")
+            .index;
+
+        Assert.Contains("WHERE \"SourceCode\" IS NOT NULL", preflightSql, StringComparison.Ordinal);
+        Assert.Contains("GROUP BY \"SourceCode\"", preflightSql, StringComparison.Ordinal);
+        Assert.Contains("HAVING COUNT(*) > 1", preflightSql, StringComparison.Ordinal);
+        Assert.True(preflight.index < uniqueIndexPosition);
     }
 
     [Fact]
@@ -151,6 +176,16 @@ public sealed class NewsIngestionPipelineTests
         }
 
         return builder.ConnectionString;
+    }
+
+    private sealed class TestAddRealtimeOutboxMigration : AddRealtimeOutbox
+    {
+        public List<MigrationOperation> GetUpOperations()
+        {
+            var migrationBuilder = new MigrationBuilder("Npgsql.EntityFrameworkCore.PostgreSQL");
+            Up(migrationBuilder);
+            return migrationBuilder.Operations;
+        }
     }
 
     private sealed class RecordingNotifier : INewsCreatedNotifier
