@@ -255,13 +255,14 @@ SignalR hub อยู่ที่ `/hubs/news` เช่น `http://localhost:51
 
 **English**
 
-Run backend tests from the repository root after PostgreSQL is available:
+Run backend tests from the repository root after PostgreSQL is available. Set the test connection string for the current PowerShell session first:
 
 **ไทย**
 
-หลังจาก PostgreSQL พร้อมใช้งาน ให้รัน backend tests จาก root ของ repository:
+หลังจาก PostgreSQL พร้อมใช้งาน ให้กำหนด test connection string สำหรับ PowerShell session ปัจจุบัน แล้วรัน backend tests จาก root ของ repository:
 
 ```powershell
+$env:STOCKPULSE_TEST_CONNECTION = 'Host=localhost;Port=5432;Database=stockpulse_test;Username=stockpulse;Password=stockpulse_local_only'
 dotnet test backend/StockPulse.sln
 ```
 
