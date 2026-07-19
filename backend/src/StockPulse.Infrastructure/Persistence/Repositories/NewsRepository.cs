@@ -13,6 +13,7 @@ public sealed class NewsRepository(StockPulseDbContext dbContext) : INewsReposit
     {
         var news = await CreateBaseQuery()
             .OrderByDescending(news => news.PublishedAtUtc)
+            .ThenByDescending(news => news.Id)
             .Take(limit)
             .Select(ProjectNews())
             .ToListAsync(cancellationToken);
@@ -46,9 +47,16 @@ public sealed class NewsRepository(StockPulseDbContext dbContext) : INewsReposit
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
+        var skip = ((long)request.Page - 1) * request.PageSize;
+        if (skip is < 0 or > int.MaxValue)
+        {
+            throw new ArgumentOutOfRangeException(nameof(request));
+        }
+
         var items = await query
             .OrderByDescending(news => news.PublishedAtUtc)
-            .Skip((request.Page - 1) * request.PageSize)
+            .ThenByDescending(news => news.Id)
+            .Skip((int)skip)
             .Take(request.PageSize)
             .Select(ProjectNews())
             .ToListAsync(cancellationToken);
@@ -58,7 +66,7 @@ public sealed class NewsRepository(StockPulseDbContext dbContext) : INewsReposit
             request.Page,
             request.PageSize,
             totalCount,
-            request.Page * request.PageSize < totalCount);
+            skip + request.PageSize < totalCount);
     }
 
     private IQueryable<StockNews> CreateBaseQuery() =>

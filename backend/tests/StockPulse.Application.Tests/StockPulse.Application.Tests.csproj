@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\StockPulse.Application\StockPulse.Application.csproj" />
+    <ProjectReference Include="..\..\src\StockPulse.Api\StockPulse.Api.csproj" />
   </ItemGroup>
 
 </Project>

@@ -25,6 +25,36 @@ public sealed class NewsQueryServiceTests
 
         Assert.Equal("NVDA", repository.LastRequest!.Ticker);
     }
+
+    [Fact]
+    public async Task QueryAsync_RejectsUnsupportedSentiment()
+    {
+        var service = NewsQueryService.CreateForTest();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.QueryAsync(
+            new NewsQueryRequest(null, null, "mixed", null),
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task QueryAsync_RejectsNumericSentiment()
+    {
+        var service = NewsQueryService.CreateForTest();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.QueryAsync(
+            new NewsQueryRequest(null, null, "1", null),
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task QueryAsync_RejectsPageThatWouldOverflowSkip()
+    {
+        var service = NewsQueryService.CreateForTest();
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => service.QueryAsync(
+            new NewsQueryRequest(null, null, null, null, int.MaxValue, 2),
+            CancellationToken.None));
+    }
 #pragma warning restore CA1707
 
     private sealed class CapturingNewsRepository : INewsRepository

@@ -1,5 +1,6 @@
 using StockPulse.Application.Abstractions;
 using StockPulse.Application.DTOs;
+using StockPulse.Domain.Enums;
 
 namespace StockPulse.Application.Services;
 
@@ -29,6 +30,18 @@ public sealed class NewsQueryService(INewsRepository repository)
         if (request.PageSize is < 1 or > 200)
         {
             throw new ArgumentOutOfRangeException(nameof(request));
+        }
+
+        var skip = ((long)request.Page - 1) * request.PageSize;
+        if (skip > int.MaxValue)
+        {
+            throw new ArgumentOutOfRangeException(nameof(request), "Page and page size are too large.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Sentiment) &&
+            !Enum.GetNames<NewsSentiment>().Contains(request.Sentiment.Trim(), StringComparer.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Sentiment is invalid.", nameof(request));
         }
 
         var normalizedRequest = request.Ticker is null
