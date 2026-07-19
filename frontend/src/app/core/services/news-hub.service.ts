@@ -15,6 +15,10 @@ export class NewsHubService {
   readonly connectionState = signal<HubConnectionState>(HubConnectionState.Disconnected);
 
   connect(): Promise<void> {
+    if (this.connectionPromise) {
+      return this.connectionPromise;
+    }
+
     const currentState = this.connectionState();
     if (
       currentState === HubConnectionState.Connected ||
@@ -22,10 +26,6 @@ export class NewsHubService {
       currentState === HubConnectionState.Reconnecting
     ) {
       return Promise.resolve();
-    }
-
-    if (this.connectionPromise) {
-      return this.connectionPromise;
     }
 
     this.connectionState.set(HubConnectionState.Connecting);

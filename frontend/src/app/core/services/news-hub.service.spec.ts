@@ -20,9 +20,16 @@ describe('NewsHubService', () => {
 
     const firstConnect = service.connect();
     const secondConnect = service.connect();
+    let secondConnectCompleted = false;
+    void secondConnect.then(() => {
+      secondConnectCompleted = true;
+    });
+
+    await Promise.resolve();
 
     expect(service.connectionState()).toBe(HubConnectionState.Connecting);
     expect(HubConnectionBuilder.prototype.build).toHaveBeenCalledTimes(1);
+    expect(secondConnectCompleted).toBeFalse();
 
     resolveStart?.();
     await Promise.all([firstConnect, secondConnect]);
