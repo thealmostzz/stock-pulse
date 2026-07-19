@@ -16,7 +16,7 @@ namespace StockPulse.Infrastructure.Persistence.Migrations
                 incrementBy: 10);
 
             migrationBuilder.Sql(
-                "SELECT setval('stock_news_hilo', GREATEST(1, (SELECT COALESCE(MAX(\"Id\"), 0) / 10 + 1 FROM stock_news)), false);");
+                "SELECT setval('stock_news_hilo', COALESCE((SELECT MAX(\"Id\") + 20 FROM stock_news), 1), true);");
 
             migrationBuilder.AlterColumn<long>(
                 name: "Id",

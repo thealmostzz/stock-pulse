@@ -37,7 +37,7 @@ public sealed class InternalRealtimeController(
             cancellationToken);
         if (receiptInserted != 0)
         {
-            await realtimePublisher.PublishNewsCreatedAsync(message, cancellationToken);
+            await realtimePublisher.PublishNewsCreatedAsync(message with { EventId = eventId }, cancellationToken);
         }
 
         await transaction.CommitAsync(cancellationToken);

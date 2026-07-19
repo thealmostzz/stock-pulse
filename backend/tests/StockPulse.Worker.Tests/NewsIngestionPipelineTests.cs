@@ -127,6 +127,7 @@ public sealed class NewsIngestionPipelineTests
             Assert.Null(outboxEvent.DeliveredAtUtc);
             Assert.NotNull(message);
             Assert.Equal(outboxEvent.NewsId, message!.News.Id);
+            Assert.Equal(outboxEvent.EventId, message.EventId);
         }
         finally
         {
@@ -151,18 +152,20 @@ public sealed class NewsIngestionPipelineTests
 
             await dispatcher.DispatchPendingAsync(CancellationToken.None);
 
-            Assert.Equal(1, outboxEvent.AttemptCount);
-            Assert.Null(outboxEvent.DeliveredAtUtc);
-            Assert.NotNull(outboxEvent.LastError);
-            Assert.True(outboxEvent.NextAttemptAtUtc > DateTimeOffset.UtcNow);
+            var failedEvent = await dbContext.NewsOutboxEvents.SingleAsync();
+            Assert.Equal(1, failedEvent.AttemptCount);
+            Assert.Null(failedEvent.DeliveredAtUtc);
+            Assert.NotNull(failedEvent.LastError);
+            Assert.True(failedEvent.NextAttemptAtUtc > DateTimeOffset.UtcNow);
 
-            outboxEvent.NextAttemptAtUtc = DateTimeOffset.UtcNow;
+            failedEvent.NextAttemptAtUtc = DateTimeOffset.UtcNow;
             await dbContext.SaveChangesAsync();
             await dispatcher.DispatchPendingAsync(CancellationToken.None);
 
             Assert.Equal(2, notifier.AttemptCount);
-            Assert.NotNull(outboxEvent.DeliveredAtUtc);
-            Assert.Null(outboxEvent.LastError);
+            var deliveredEvent = await dbContext.NewsOutboxEvents.SingleAsync();
+            Assert.NotNull(deliveredEvent.DeliveredAtUtc);
+            Assert.Null(deliveredEvent.LastError);
         }
         finally
         {
@@ -185,7 +188,7 @@ public sealed class NewsIngestionPipelineTests
                 .Build();
             var controller = new InternalRealtimeController(configuration, dbContext, publisher);
             var eventId = Guid.NewGuid();
-            var message = new NewsCreatedEvent(DateTimeOffset.UtcNow, new NewsResponseDto(42, "test", null, "mock", "https://example.test", DateTimeOffset.UtcNow, [], "Neutral", 0m, []));
+            var message = new NewsCreatedEvent(Guid.Empty, DateTimeOffset.UtcNow, new NewsResponseDto(42, "test", null, "mock", "https://example.test", DateTimeOffset.UtcNow, [], "Neutral", 0m, []));
             controller.ControllerContext = CreateControllerContext(eventId);
 
             var first = await controller.NewsCreated(message, CancellationToken.None);
@@ -195,7 +198,108 @@ public sealed class NewsIngestionPipelineTests
             Assert.IsType<NoContentResult>(first);
             Assert.IsType<NoContentResult>(second);
             Assert.Single(publisher.Messages);
+            Assert.Equal(eventId, publisher.Messages.Single().EventId);
             Assert.Equal(eventId, await dbContext.RealtimeDeliveryReceipts.Select(receipt => receipt.EventId).SingleAsync());
+        }
+        finally
+        {
+            await DropSchemaAsync(schemaName);
+        }
+    }
+
+    [Fact]
+    public async Task DispatchPendingAsync_ClaimsEventForOnlyOneDispatcher()
+    {
+        var schemaName = $"worker_test_{Guid.NewGuid():N}";
+        await CreateSchemaAsync(schemaName);
+
+        try
+        {
+            await using var firstDbContext = await CreateSchemaDbContextAsync(schemaName);
+            await using var secondDbContext = CreateSchemaDbContext(schemaName);
+            var pipeline = new NewsIngestionPipeline(firstDbContext);
+            await pipeline.IngestAsync([CreateArticle("https://example.test/lease", DateTimeOffset.UtcNow)], CancellationToken.None);
+            var firstNotifier = new BlockingNotifier();
+            var secondNotifier = new RecordingNotifier();
+            var firstDispatcher = new OutboxDispatcher(firstDbContext, firstNotifier, NullLogger<OutboxDispatcher>.Instance);
+            var secondDispatcher = new OutboxDispatcher(secondDbContext, secondNotifier, NullLogger<OutboxDispatcher>.Instance);
+
+            var firstDispatch = firstDispatcher.DispatchPendingAsync(CancellationToken.None);
+            await firstNotifier.Started.WaitAsync(TimeSpan.FromSeconds(5));
+            await secondDispatcher.DispatchPendingAsync(CancellationToken.None);
+            firstNotifier.Release();
+            await firstDispatch;
+
+            Assert.Equal(1, firstNotifier.AttemptCount);
+            Assert.Empty(secondNotifier.Messages);
+            firstDbContext.ChangeTracker.Clear();
+            Assert.NotNull((await firstDbContext.NewsOutboxEvents.SingleAsync()).DeliveredAtUtc);
+        }
+        finally
+        {
+            await DropSchemaAsync(schemaName);
+        }
+    }
+
+    [Fact]
+    public async Task IngestAsync_PreservesUnrelatedArticles_WhenConcurrentBatchCollides()
+    {
+        var schemaName = $"worker_test_{Guid.NewGuid():N}";
+        await CreateSchemaAsync(schemaName);
+
+        try
+        {
+            await using var firstDbContext = await CreateSchemaDbContextAsync(schemaName);
+            await using var secondDbContext = CreateSchemaDbContext(schemaName);
+            var firstPipeline = new NewsIngestionPipeline(firstDbContext);
+            var secondPipeline = new NewsIngestionPipeline(secondDbContext);
+            var publishedAt = DateTimeOffset.UtcNow;
+
+            await Task.WhenAll(
+                firstPipeline.IngestAsync(
+                    [CreateArticle("https://example.test/common", publishedAt), CreateArticle("https://example.test/first", publishedAt)],
+                    CancellationToken.None),
+                secondPipeline.IngestAsync(
+                    [CreateArticle("https://example.test/common", publishedAt), CreateArticle("https://example.test/second", publishedAt)],
+                    CancellationToken.None));
+
+            firstDbContext.ChangeTracker.Clear();
+            Assert.Equal(3, await firstDbContext.StockNews.CountAsync());
+            Assert.Equal(3, await firstDbContext.NewsOutboxEvents.CountAsync());
+        }
+        finally
+        {
+            await DropSchemaAsync(schemaName);
+        }
+    }
+
+    [Fact]
+    public async Task UseHiLoMigration_AllocatesAboveExistingIdsAcrossMultipleBlocks()
+    {
+        var schemaName = $"worker_test_{Guid.NewGuid():N}";
+        await CreateSchemaAsync(schemaName);
+
+        try
+        {
+            await using var dbContext = await CreateSchemaDbContextAsync(schemaName);
+            var source = new NewsSource { SourceCode = "seed", SourceName = "seed" };
+            dbContext.NewsSources.Add(source);
+            await dbContext.SaveChangesAsync();
+            dbContext.StockNews.AddRange(
+                CreateSeedNews(1, source.Id),
+                CreateSeedNews(11, source.Id),
+                CreateSeedNews(29, source.Id));
+            await dbContext.SaveChangesAsync();
+            var migration = new TestUseHiLoForStockNewsIdsMigration();
+            var resetSql = migration.GetUpOperations()
+                .OfType<SqlOperation>()
+                .Single(operation => operation.Sql.Contains("setval", StringComparison.Ordinal));
+            await dbContext.Database.ExecuteSqlRawAsync(resetSql.Sql);
+
+            var nextHighValue = await dbContext.Database
+                .SqlQueryRaw<long>("SELECT nextval('stock_news_hilo') AS \"Value\"")
+                .SingleAsync();
+            Assert.True(nextHighValue - 10 > 29, $"Expected the next HiLo block to start above 29 but received high value {nextHighValue}.");
         }
         finally
         {
@@ -240,6 +344,14 @@ public sealed class NewsIngestionPipelineTests
     {
         var options = new DbContextOptionsBuilder<StockPulseDbContext>()
             .UseNpgsql(GetDatabaseConnectionString())
+            .Options;
+        return new StockPulseDbContext(options);
+    }
+
+    private static StockPulseDbContext CreateSchemaDbContext(string schemaName)
+    {
+        var options = new DbContextOptionsBuilder<StockPulseDbContext>()
+            .UseNpgsql($"{GetDatabaseConnectionString()};Search Path={schemaName}")
             .Options;
         return new StockPulseDbContext(options);
     }
@@ -307,6 +419,29 @@ public sealed class NewsIngestionPipelineTests
         }
     }
 
+    private sealed class TestUseHiLoForStockNewsIdsMigration : UseHiLoForStockNewsIds
+    {
+        public List<MigrationOperation> GetUpOperations()
+        {
+            var migrationBuilder = new MigrationBuilder("Npgsql.EntityFrameworkCore.PostgreSQL");
+            Up(migrationBuilder);
+            return migrationBuilder.Operations;
+        }
+    }
+
+    private static StockNews CreateSeedNews(long id, short sourceId) =>
+        new()
+        {
+            Id = id,
+            SourceId = sourceId,
+            ExternalUrl = $"https://example.test/seed/{id}",
+            Title = $"Seed {id}",
+            DedupHash = $"{id:D64}",
+            PublishedAtUtc = DateTimeOffset.UtcNow,
+            ReceivedAtUtc = DateTimeOffset.UtcNow,
+            RawPayload = JsonDocument.Parse("{}")
+        };
+
     private sealed class RecordingNotifier : INewsCreatedNotifier
     {
         public List<NewsCreatedEvent> Messages { get; } = [];
@@ -329,6 +464,24 @@ public sealed class NewsIngestionPipelineTests
                 ? Task.FromException(new HttpRequestException("API is temporarily unavailable."))
                 : Task.CompletedTask;
         }
+    }
+
+    private sealed class BlockingNotifier : INewsCreatedNotifier
+    {
+        private readonly TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task Started => started.Task;
+        public int AttemptCount { get; private set; }
+
+        public async Task NotifyAsync(Guid eventId, NewsCreatedEvent message, CancellationToken cancellationToken)
+        {
+            AttemptCount++;
+            started.TrySetResult();
+            await release.Task.WaitAsync(cancellationToken);
+        }
+
+        public void Release() => release.TrySetResult();
     }
 
     private sealed class RecordingPublisher : IRealtimePublisher

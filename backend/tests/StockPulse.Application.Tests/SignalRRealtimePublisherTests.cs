@@ -18,23 +18,28 @@ public sealed class SignalRRealtimePublisherTests
         var hubContext = DispatchProxy.Create<IHubContext<NewsHub>, HubContextProxy>();
         ((HubContextProxy)(object)hubContext).Clients = clients;
         var publisher = new SignalRRealtimePublisher(hubContext);
+        var eventId = Guid.NewGuid();
         var message = new NewsCreatedEvent(
+            eventId,
             DateTimeOffset.UtcNow,
             new NewsResponseDto(1, "Title", null, "source", "https://example.test/news", DateTimeOffset.UtcNow, ["NVDA"], "Neutral", 0m, []));
 
         await publisher.PublishNewsCreatedAsync(message, CancellationToken.None);
 
         Assert.Equal(["news:new"], client.MethodNames);
+        Assert.Equal(eventId, Assert.IsType<NewsCreatedEvent>(Assert.Single(client.Arguments)).EventId);
     }
 #pragma warning restore CA1707
 
     private sealed class RecordingClientProxy : IClientProxy
     {
         public List<string> MethodNames { get; } = [];
+        public List<object?> Arguments { get; } = [];
 
         public Task SendCoreAsync(string method, object?[] args, CancellationToken cancellationToken)
         {
             MethodNames.Add(method);
+            Arguments.Add(args.Single());
             return Task.CompletedTask;
         }
     }

@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using StockPulse.Application.DTOs;
 using StockPulse.Contracts.News;
 using StockPulse.Domain.Entities;
@@ -16,7 +17,6 @@ public sealed class NewsIngestionPipeline(
 {
     public async Task IngestAsync(IReadOnlyList<NormalizedNewsDto> articles, CancellationToken cancellationToken)
     {
-        var insertedNews = new List<StockNews>();
         var batchHashes = new HashSet<string>(StringComparer.Ordinal);
         var candidates = new List<(NormalizedNewsDto Article, string Hash)>();
 
@@ -43,41 +43,33 @@ public sealed class NewsIngestionPipeline(
             .Select(candidate => candidate.Article.SourceCode.Trim().ToLowerInvariant())
             .Distinct(StringComparer.Ordinal)
             .ToArray();
-        var sources = await dbContext.NewsSources
+        await EnsureSourcesExistAsync(sourceCodes, cancellationToken);
+        var sourceIds = await dbContext.NewsSources
             .Where(source => sourceCodes.Contains(source.SourceCode))
-            .ToDictionaryAsync(source => source.SourceCode, StringComparer.OrdinalIgnoreCase, cancellationToken);
+            .ToDictionaryAsync(source => source.SourceCode, source => source.Id, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
-        foreach (var (article, hash) in candidates)
+        var pendingCandidates = candidates
+            .Where(candidate => !existingHashes.Contains(candidate.Hash))
+            .ToArray();
+        foreach (var (article, hash) in pendingCandidates)
         {
-            if (existingHashes.Contains(hash))
-            {
-                continue;
-            }
-
-            var source = GetOrCreateSource(article.SourceCode, sources);
-            var news = CreateNews(article, source, hash);
-            dbContext.StockNews.Add(news);
-            insertedNews.Add(news);
+            AddNewsWithOutboxEvent(article, hash, sourceIds);
         }
 
-        if (insertedNews.Count == 0)
+        if (pendingCandidates.Length == 0)
         {
             return;
         }
 
-        foreach (var news in insertedNews)
+        try
         {
-            dbContext.NewsOutboxEvents.Add(new NewsOutboxEvent
-            {
-                EventId = Guid.NewGuid(),
-                News = news,
-                Payload = JsonSerializer.SerializeToDocument(CreateNewsCreatedEvent(news)),
-                NextAttemptAtUtc = DateTimeOffset.UtcNow,
-                CreatedAtUtc = DateTimeOffset.UtcNow
-            });
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
-
-        await dbContext.SaveChangesAsync(cancellationToken);
+        catch (DbUpdateException exception) when (IsUniqueViolation(exception))
+        {
+            dbContext.ChangeTracker.Clear();
+            await SaveCandidatesAfterConcurrentConflictAsync(pendingCandidates, sourceIds, cancellationToken);
+        }
     }
 
     public static string CreateDedupHash(string title, string url, DateTimeOffset publishedAtUtc, string sourceCode)
@@ -96,29 +88,80 @@ public sealed class NewsIngestionPipeline(
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
     }
 
-    private NewsSource GetOrCreateSource(
-        string sourceCode,
-        Dictionary<string, NewsSource> sources)
+    private async Task EnsureSourcesExistAsync(string[] sourceCodes, CancellationToken cancellationToken)
     {
-        var normalizedSourceCode = sourceCode.Trim().ToLowerInvariant();
-        if (sources.TryGetValue(normalizedSourceCode, out var cachedSource))
+        if (sourceCodes.Length == 0)
         {
-            return cachedSource;
+            return;
         }
 
-        var source = new NewsSource
+        var parameters = new List<NpgsqlParameter>(sourceCodes.Length * 2);
+        var values = new List<string>(sourceCodes.Length);
+        for (var index = 0; index < sourceCodes.Length; index++)
         {
-            SourceCode = normalizedSourceCode,
-            SourceName = normalizedSourceCode,
-            IsEnabled = true
-        };
-        dbContext.NewsSources.Add(source);
+            var sourceCode = sourceCodes[index];
+            var codeParameterName = $"sourceCode{index}";
+            var nameParameterName = $"sourceName{index}";
+            parameters.Add(new NpgsqlParameter(codeParameterName, sourceCode));
+            parameters.Add(new NpgsqlParameter(nameParameterName, sourceCode));
+            values.Add($"(@{codeParameterName}, @{nameParameterName}, TRUE)");
+        }
 
-        sources[normalizedSourceCode] = source;
-        return source;
+#pragma warning disable EF1002 // Only generated parameter names are interpolated; every source value is an NpgsqlParameter.
+        await dbContext.Database.ExecuteSqlRawAsync(
+            $"INSERT INTO \"NewsSources\" (\"SourceCode\", \"SourceName\", \"IsEnabled\") VALUES {string.Join(", ", values)} ON CONFLICT (\"SourceCode\") DO NOTHING",
+            parameters,
+            cancellationToken);
+#pragma warning restore EF1002
     }
 
-    private static StockNews CreateNews(NormalizedNewsDto article, NewsSource source, string hash)
+    private void AddNewsWithOutboxEvent(
+        NormalizedNewsDto article,
+        string hash,
+        IReadOnlyDictionary<string, short> sourceIds)
+    {
+        var normalizedSourceCode = article.SourceCode.Trim().ToLowerInvariant();
+        var news = CreateNews(article, sourceIds[normalizedSourceCode], hash);
+        var eventId = Guid.NewGuid();
+        dbContext.StockNews.Add(news);
+        dbContext.NewsOutboxEvents.Add(new NewsOutboxEvent
+        {
+            EventId = eventId,
+            News = news,
+            Payload = JsonSerializer.SerializeToDocument(CreateNewsCreatedEvent(eventId, news, normalizedSourceCode)),
+            NextAttemptAtUtc = DateTimeOffset.UtcNow,
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        });
+    }
+
+    private async Task SaveCandidatesAfterConcurrentConflictAsync(
+        IReadOnlyList<(NormalizedNewsDto Article, string Hash)> candidates,
+        IReadOnlyDictionary<string, short> sourceIds,
+        CancellationToken cancellationToken)
+    {
+        var currentHashes = await dbContext.StockNews
+            .Where(news => candidates.Select(candidate => candidate.Hash).Contains(news.DedupHash))
+            .Select(news => news.DedupHash)
+            .ToHashSetAsync(cancellationToken);
+
+        foreach (var candidate in candidates.Where(candidate => !currentHashes.Contains(candidate.Hash)))
+        {
+            AddNewsWithOutboxEvent(candidate.Article, candidate.Hash, sourceIds);
+            try
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException exception) when (IsUniqueViolation(exception))
+            {
+                dbContext.ChangeTracker.Clear();
+            }
+        }
+    }
+
+    private static bool IsUniqueViolation(DbUpdateException exception) =>
+        exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation };
+
+    private static StockNews CreateNews(NormalizedNewsDto article, short sourceId, string hash)
     {
         var tickers = article.Tickers
             .Select(ticker => ticker.Trim().ToUpperInvariant())
@@ -127,7 +170,7 @@ public sealed class NewsIngestionPipeline(
             .ToArray();
         var news = new StockNews
         {
-            Source = source,
+            SourceId = sourceId,
             ProviderNewsKey = article.ProviderNewsKey,
             ExternalUrl = article.ExternalUrl,
             CanonicalUrl = CanonicalizeUrl(article.ExternalUrl),
@@ -156,14 +199,15 @@ public sealed class NewsIngestionPipeline(
         return news;
     }
 
-    private static NewsCreatedEvent CreateNewsCreatedEvent(StockNews news) =>
+    private static NewsCreatedEvent CreateNewsCreatedEvent(Guid eventId, StockNews news, string sourceCode) =>
         new(
+            eventId,
             DateTimeOffset.UtcNow,
             new NewsResponseDto(
                 news.Id,
                 news.Title,
                 news.Summary,
-                news.Source.SourceCode,
+                sourceCode,
                 news.ExternalUrl,
                 news.PublishedAtUtc,
                 news.Tickers.Select(ticker => ticker.Ticker).ToArray(),

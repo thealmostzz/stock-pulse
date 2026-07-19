@@ -16,9 +16,12 @@ public sealed class NewsOutboxEventConfiguration : IEntityTypeConfiguration<News
         builder.Property(outboxEvent => outboxEvent.AttemptCount).HasColumnName("attempt_count");
         builder.Property(outboxEvent => outboxEvent.NextAttemptAtUtc).HasColumnName("next_attempt_at_utc");
         builder.Property(outboxEvent => outboxEvent.DeliveredAtUtc).HasColumnName("delivered_at_utc");
+        builder.Property(outboxEvent => outboxEvent.LockedUntilUtc).HasColumnName("locked_until_utc");
+        builder.Property(outboxEvent => outboxEvent.LockToken).HasColumnName("lock_token");
         builder.Property(outboxEvent => outboxEvent.LastError).HasColumnName("last_error");
         builder.Property(outboxEvent => outboxEvent.CreatedAtUtc).HasColumnName("created_at_utc");
         builder.HasIndex(outboxEvent => new { outboxEvent.DeliveredAtUtc, outboxEvent.NextAttemptAtUtc });
+        builder.HasIndex(outboxEvent => new { outboxEvent.LockToken, outboxEvent.LockedUntilUtc });
         builder.HasOne(outboxEvent => outboxEvent.News)
             .WithOne()
             .HasForeignKey<NewsOutboxEvent>(outboxEvent => outboxEvent.NewsId)
