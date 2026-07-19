@@ -242,6 +242,75 @@ public sealed class NewsIngestionPipelineTests
     }
 
     [Fact]
+    public async Task DispatchPendingAsync_ClaimsAtMostOneBoundedBatch()
+    {
+        var schemaName = $"worker_test_{Guid.NewGuid():N}";
+        await CreateSchemaAsync(schemaName);
+
+        try
+        {
+            await using var dbContext = await CreateSchemaDbContextAsync(schemaName);
+            var source = new NewsSource { SourceCode = "batch", SourceName = "batch" };
+            dbContext.NewsSources.Add(source);
+            await dbContext.SaveChangesAsync();
+            var news = Enumerable.Range(0, 101)
+                .Select(index => CreateSeedNews(1000 + index, source.Id))
+                .ToArray();
+            dbContext.StockNews.AddRange(news);
+            await dbContext.SaveChangesAsync();
+            dbContext.NewsOutboxEvents.AddRange(news.Select(CreateSeedOutboxEvent));
+            await dbContext.SaveChangesAsync();
+            var notifier = new RecordingNotifier();
+            var dispatcher = new OutboxDispatcher(dbContext, notifier, NullLogger<OutboxDispatcher>.Instance);
+
+            await dispatcher.DispatchPendingAsync(CancellationToken.None);
+
+            Assert.Equal(100, notifier.Messages.Count);
+            dbContext.ChangeTracker.Clear();
+            Assert.Equal(1, await dbContext.NewsOutboxEvents.CountAsync(outboxEvent => outboxEvent.DeliveredAtUtc == null));
+        }
+        finally
+        {
+            await DropSchemaAsync(schemaName);
+        }
+    }
+
+    [Fact]
+    public async Task DispatchPendingAsync_DoesNotFinalizeEvent_WhenLeaseTokenChanges()
+    {
+        var schemaName = $"worker_test_{Guid.NewGuid():N}";
+        await CreateSchemaAsync(schemaName);
+
+        try
+        {
+            await using var dispatchDbContext = await CreateSchemaDbContextAsync(schemaName);
+            await using var leaseDbContext = CreateSchemaDbContext(schemaName);
+            var pipeline = new NewsIngestionPipeline(dispatchDbContext);
+            await pipeline.IngestAsync([CreateArticle("https://example.test/stale-lease", DateTimeOffset.UtcNow)], CancellationToken.None);
+            var notifier = new BlockingNotifier();
+            var dispatcher = new OutboxDispatcher(dispatchDbContext, notifier, NullLogger<OutboxDispatcher>.Instance);
+            var dispatchTask = dispatcher.DispatchPendingAsync(CancellationToken.None);
+            await notifier.Started.WaitAsync(TimeSpan.FromSeconds(5));
+            var replacementToken = Guid.NewGuid();
+            await leaseDbContext.NewsOutboxEvents.ExecuteUpdateAsync(setters => setters
+                .SetProperty(outboxEvent => outboxEvent.LockToken, replacementToken)
+                .SetProperty(outboxEvent => outboxEvent.LockedUntilUtc, DateTimeOffset.UtcNow.AddMinutes(5)));
+
+            notifier.Release();
+            await dispatchTask;
+
+            leaseDbContext.ChangeTracker.Clear();
+            var outboxEvent = await leaseDbContext.NewsOutboxEvents.SingleAsync();
+            Assert.Equal(replacementToken, outboxEvent.LockToken);
+            Assert.Null(outboxEvent.DeliveredAtUtc);
+        }
+        finally
+        {
+            await DropSchemaAsync(schemaName);
+        }
+    }
+
+    [Fact]
     public async Task IngestAsync_PreservesUnrelatedArticles_WhenConcurrentBatchCollides()
     {
         var schemaName = $"worker_test_{Guid.NewGuid():N}";
@@ -441,6 +510,23 @@ public sealed class NewsIngestionPipelineTests
             ReceivedAtUtc = DateTimeOffset.UtcNow,
             RawPayload = JsonDocument.Parse("{}")
         };
+
+    private static NewsOutboxEvent CreateSeedOutboxEvent(StockNews news)
+    {
+        var eventId = Guid.NewGuid();
+        return new NewsOutboxEvent
+        {
+            EventId = eventId,
+            NewsId = news.Id,
+            Payload = JsonSerializer.SerializeToDocument(
+                new NewsCreatedEvent(
+                    eventId,
+                    DateTimeOffset.UtcNow,
+                    new NewsResponseDto(news.Id, news.Title, news.Summary, "batch", news.ExternalUrl, news.PublishedAtUtc, [], "Neutral", 0m, []))),
+            NextAttemptAtUtc = DateTimeOffset.UtcNow,
+            CreatedAtUtc = DateTimeOffset.UtcNow
+        };
+    }
 
     private sealed class RecordingNotifier : INewsCreatedNotifier
     {
