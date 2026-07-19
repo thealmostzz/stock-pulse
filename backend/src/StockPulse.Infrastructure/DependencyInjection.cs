@@ -14,6 +14,7 @@ public static class DependencyInjection
         services.AddDbContext<StockPulseDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("StockPulse")));
         services.AddScoped<IWatchlistRepository, WatchlistRepository>();
+        services.AddScoped<INewsRepository, NewsRepository>();
         return services;
     }
 }

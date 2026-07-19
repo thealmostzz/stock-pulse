@@ -1,3 +1,6 @@
+using StockPulse.Api.Hubs;
+using StockPulse.Api.Services;
+using StockPulse.Application.Abstractions;
 using StockPulse.Application.Services;
 using StockPulse.Infrastructure;
 
@@ -8,11 +11,15 @@ builder.Services.AddOpenApi();
 builder.Services.AddSwaggerGen();
 builder.Services.AddStockPulseInfrastructure(builder.Configuration);
 builder.Services.AddScoped<WatchlistService>();
+builder.Services.AddScoped<NewsQueryService>();
+builder.Services.AddScoped<IRealtimePublisher, SignalRRealtimePublisher>();
+builder.Services.AddSignalR();
 builder.Services.AddCors(options =>
-    options.AddPolicy("LocalAngularDevelopment", policy =>
+    options.AddPolicy("local-angular", policy =>
         policy.WithOrigins("http://localhost:4200")
             .AllowAnyHeader()
-            .AllowAnyMethod()));
+            .AllowAnyMethod()
+            .AllowCredentials()));
 
 var app = builder.Build();
 
@@ -30,10 +37,11 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseCors("LocalAngularDevelopment");
+app.UseCors("local-angular");
 
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<NewsHub>("/hubs/news");
 
 app.Run();

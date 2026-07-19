@@ -1,11 +1,10 @@
-using System.Text.RegularExpressions;
 using StockPulse.Application.Abstractions;
 using StockPulse.Application.DTOs;
 using StockPulse.Domain.Entities;
 
 namespace StockPulse.Application.Services;
 
-public sealed partial class WatchlistService(IWatchlistRepository repository)
+public sealed class WatchlistService(IWatchlistRepository repository)
 {
     public static WatchlistService CreateForTest() => new(new InMemoryWatchlistRepository());
 
@@ -18,7 +17,7 @@ public sealed partial class WatchlistService(IWatchlistRepository repository)
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        var ticker = NormalizeTicker(request.Ticker);
+        var ticker = TickerNormalizer.Normalize(request.Ticker);
         var item = await repository.AddAsync(
             new WatchlistItem
             {
@@ -32,26 +31,10 @@ public sealed partial class WatchlistService(IWatchlistRepository repository)
     }
 
     public Task<bool> RemoveAsync(string ticker, CancellationToken cancellationToken) =>
-        repository.RemoveAsync(NormalizeTicker(ticker), cancellationToken);
+        repository.RemoveAsync(TickerNormalizer.Normalize(ticker), cancellationToken);
 
     private static WatchlistItemDto MapToDto(WatchlistItem item) =>
         new(item.Id, item.Ticker, item.DisplayName, item.Market, item.SortOrder, item.IsActive);
-
-    private static string NormalizeTicker(string ticker)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(ticker);
-
-        var normalizedTicker = ticker.Trim().ToUpperInvariant();
-        if (!TickerPattern().IsMatch(normalizedTicker))
-        {
-            throw new ArgumentException("Ticker format is invalid.", nameof(ticker));
-        }
-
-        return normalizedTicker;
-    }
-
-    [GeneratedRegex("^[A-Z][A-Z0-9.-]{0,19}$")]
-    private static partial Regex TickerPattern();
 
     private sealed class InMemoryWatchlistRepository : IWatchlistRepository
     {
