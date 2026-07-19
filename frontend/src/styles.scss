@@ -1,1 +1,14 @@
-/* You can add global styles to this file, and also import other style files */
+@use './styles/tokens';
+
+html,
+body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--sp-bg);
+  color: var(--sp-text);
+  font-family: 'IBM Plex Mono', Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
