@@ -1,0 +1,4 @@
+[
+  { "id": "mock-001", "url": "https://example.test/nvda-earnings", "title": "NVIDIA beats estimates on data-center demand", "summary": "Mock earnings article for local development.", "publishedAtUtc": "2026-07-18T08:10:00Z", "tickers": ["NVDA"] },
+  { "id": "mock-002", "url": "https://example.test/aapl-dividend", "title": "Apple raises dividend after record services revenue", "summary": "Mock dividend article for local development.", "publishedAtUtc": "2026-07-18T08:12:00Z", "tickers": ["AAPL"] }
+]
