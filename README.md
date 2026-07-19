@@ -96,7 +96,7 @@ External news providers ──► Planned; not connected
 
 | Area | Technology |
 | --- | --- |
-| Frontend | Angular 18, TypeScript, SCSS |
+| Frontend | Angular 22, TypeScript 6, SCSS |
 | API | ASP.NET Core Web API on .NET 10 |
 | Realtime | ASP.NET Core SignalR |
 | Data access | Entity Framework Core and Npgsql |
@@ -106,7 +106,7 @@ External news providers ──► Planned; not connected
 
 **ไทย**
 
-Frontend ใช้ Angular 18 ส่วน backend ใช้ ASP.NET Core บน .NET 10, PostgreSQL 16 เป็นฐานข้อมูลหลักสำหรับ local development และ SignalR สำหรับ realtime updates
+Frontend ใช้ Angular 22 และ TypeScript 6 ส่วน backend ใช้ ASP.NET Core บน .NET 10, PostgreSQL 16 เป็นฐานข้อมูลหลักสำหรับ local development และ SignalR สำหรับ realtime updates
 
 ## Prerequisites / สิ่งที่ต้องเตรียม
 
