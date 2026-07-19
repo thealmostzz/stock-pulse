@@ -9,6 +9,7 @@ public sealed class StockPulseDbContext(DbContextOptions<StockPulseDbContext> op
     public DbSet<StockNews> StockNews => Set<StockNews>();
     public DbSet<StockNewsTicker> StockNewsTickers => Set<StockNewsTicker>();
     public DbSet<NewsOutboxEvent> NewsOutboxEvents => Set<NewsOutboxEvent>();
+    public DbSet<RealtimeDeliveryReceipt> RealtimeDeliveryReceipts => Set<RealtimeDeliveryReceipt>();
     public DbSet<WatchlistItem> WatchlistItems => Set<WatchlistItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

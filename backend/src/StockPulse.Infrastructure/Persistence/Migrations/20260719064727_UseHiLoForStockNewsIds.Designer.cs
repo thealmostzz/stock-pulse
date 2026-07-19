@@ -3,6 +3,7 @@ using System;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using StockPulse.Infrastructure.Persistence;
@@ -12,9 +13,11 @@ using StockPulse.Infrastructure.Persistence;
 namespace StockPulse.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(StockPulseDbContext))]
-    partial class StockPulseDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260719064727_UseHiLoForStockNewsIds")]
+    partial class UseHiLoForStockNewsIds
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

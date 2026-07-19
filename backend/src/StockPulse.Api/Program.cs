@@ -5,6 +5,12 @@ using StockPulse.Application.Services;
 using StockPulse.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
+var internalRealtimeSharedKey = builder.Configuration["InternalRealtime:SharedKey"];
+if (string.IsNullOrWhiteSpace(internalRealtimeSharedKey) ||
+    string.Equals(internalRealtimeSharedKey, "change-me", StringComparison.OrdinalIgnoreCase))
+{
+    throw new InvalidOperationException("InternalRealtime:SharedKey must be configured and must not use a placeholder value.");
+}
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();

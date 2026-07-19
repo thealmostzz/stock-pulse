@@ -3,6 +3,7 @@ using System;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using StockPulse.Infrastructure.Persistence;
@@ -12,9 +13,11 @@ using StockPulse.Infrastructure.Persistence;
 namespace StockPulse.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(StockPulseDbContext))]
-    partial class StockPulseDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260719064630_AddRealtimeDeliveryReceipts")]
+    partial class AddRealtimeDeliveryReceipts
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -22,9 +25,6 @@ namespace StockPulse.Infrastructure.Persistence.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.HasSequence("stock_news_hilo")
-                .IncrementsBy(10);
 
             modelBuilder.Entity("StockPulse.Domain.Entities.NewsOutboxEvent", b =>
                 {
@@ -121,7 +121,7 @@ namespace StockPulse.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bigint");
 
-                    NpgsqlPropertyBuilderExtensions.UseHiLo(b.Property<long>("Id"), "stock_news_hilo");
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<string>("CanonicalUrl")
                         .HasColumnType("text");

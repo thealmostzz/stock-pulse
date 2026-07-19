@@ -4,5 +4,5 @@ namespace StockPulse.Worker.Services;
 
 public interface INewsCreatedNotifier
 {
-    Task NotifyAsync(NewsCreatedEvent message, CancellationToken cancellationToken);
+    Task NotifyAsync(Guid eventId, NewsCreatedEvent message, CancellationToken cancellationToken);
 }

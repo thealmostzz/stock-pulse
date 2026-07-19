@@ -10,6 +10,7 @@ public sealed class StockNewsConfiguration : IEntityTypeConfiguration<StockNews>
     {
         builder.ToTable("stock_news");
         builder.HasKey(news => news.Id);
+        builder.Property(news => news.Id).UseHiLo("stock_news_hilo");
         builder.Property(news => news.Title).IsRequired();
         builder.Property(news => news.ExternalUrl).IsRequired();
         builder.Property(news => news.DedupHash).HasMaxLength(64).IsRequired();

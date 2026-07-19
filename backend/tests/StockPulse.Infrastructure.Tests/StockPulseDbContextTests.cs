@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using StockPulse.Domain.Entities;
 using StockPulse.Infrastructure.Persistence;
 
@@ -35,14 +36,41 @@ public sealed class StockPulseDbContextTests
     {
         var connectionString = TestDatabaseConnection.GetConnectionString(
             Environment.GetEnvironmentVariable("STOCKPULSE_TEST_CONNECTION"));
-        var options = new DbContextOptionsBuilder<StockPulseDbContext>().UseNpgsql(connectionString).Options;
-        await using var db = new StockPulseDbContext(options);
-        await db.Database.EnsureDeletedAsync();
-        await db.Database.EnsureCreatedAsync();
-        db.WatchlistItems.AddRange(
-            new WatchlistItem { Ticker = "AAPL" },
-            new WatchlistItem { Ticker = "AAPL" });
+        var schemaName = $"infrastructure_test_{Guid.NewGuid():N}";
+        await CreateSchemaAsync(connectionString, schemaName);
 
-        await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        try
+        {
+            var options = new DbContextOptionsBuilder<StockPulseDbContext>()
+                .UseNpgsql($"{connectionString};Search Path={schemaName}")
+                .Options;
+            await using var db = new StockPulseDbContext(options);
+            await db.Database.ExecuteSqlRawAsync(db.Database.GenerateCreateScript());
+            db.WatchlistItems.AddRange(
+                new WatchlistItem { Ticker = "AAPL" },
+                new WatchlistItem { Ticker = "AAPL" });
+
+            await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
+        }
+        finally
+        {
+            await DropSchemaAsync(connectionString, schemaName);
+        }
+    }
+
+    private static async Task CreateSchemaAsync(string connectionString, string schemaName)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand($"CREATE SCHEMA \"{schemaName}\";", connection);
+        await command.ExecuteNonQueryAsync();
+    }
+
+    private static async Task DropSchemaAsync(string connectionString, string schemaName)
+    {
+        await using var connection = new NpgsqlConnection(connectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand($"DROP SCHEMA IF EXISTS \"{schemaName}\" CASCADE;", connection);
+        await command.ExecuteNonQueryAsync();
     }
 }

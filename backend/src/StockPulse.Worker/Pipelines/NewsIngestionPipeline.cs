@@ -12,25 +12,49 @@ using StockPulse.Worker.Services;
 namespace StockPulse.Worker.Pipelines;
 
 public sealed class NewsIngestionPipeline(
-    StockPulseDbContext dbContext,
-    INewsCreatedNotifier notifier)
+    StockPulseDbContext dbContext)
 {
     public async Task IngestAsync(IReadOnlyList<NormalizedNewsDto> articles, CancellationToken cancellationToken)
     {
         var insertedNews = new List<StockNews>();
         var batchHashes = new HashSet<string>(StringComparer.Ordinal);
-        var sources = new Dictionary<string, NewsSource>(StringComparer.OrdinalIgnoreCase);
+        var candidates = new List<(NormalizedNewsDto Article, string Hash)>();
 
         foreach (var article in articles)
         {
             var hash = CreateDedupHash(article.Title, article.ExternalUrl, article.PublishedAtUtc, article.SourceCode);
-            if (!batchHashes.Add(hash) ||
-                await dbContext.StockNews.AnyAsync(news => news.DedupHash == hash, cancellationToken))
+            if (batchHashes.Add(hash))
+            {
+                candidates.Add((article, hash));
+            }
+        }
+
+        if (candidates.Count == 0)
+        {
+            return;
+        }
+
+        var existingHashes = await dbContext.StockNews
+            .Where(news => batchHashes.Contains(news.DedupHash))
+            .Select(news => news.DedupHash)
+            .ToHashSetAsync(cancellationToken);
+        var sourceCodes = candidates
+            .Where(candidate => !existingHashes.Contains(candidate.Hash))
+            .Select(candidate => candidate.Article.SourceCode.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var sources = await dbContext.NewsSources
+            .Where(source => sourceCodes.Contains(source.SourceCode))
+            .ToDictionaryAsync(source => source.SourceCode, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+        foreach (var (article, hash) in candidates)
+        {
+            if (existingHashes.Contains(hash))
             {
                 continue;
             }
 
-            var source = await GetSourceAsync(article.SourceCode, sources, cancellationToken);
+            var source = GetOrCreateSource(article.SourceCode, sources);
             var news = CreateNews(article, source, hash);
             dbContext.StockNews.Add(news);
             insertedNews.Add(news);
@@ -41,12 +65,19 @@ public sealed class NewsIngestionPipeline(
             return;
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken);
-
         foreach (var news in insertedNews)
         {
-            await notifier.NotifyAsync(CreateNewsCreatedEvent(news), cancellationToken);
+            dbContext.NewsOutboxEvents.Add(new NewsOutboxEvent
+            {
+                EventId = Guid.NewGuid(),
+                News = news,
+                Payload = JsonSerializer.SerializeToDocument(CreateNewsCreatedEvent(news)),
+                NextAttemptAtUtc = DateTimeOffset.UtcNow,
+                CreatedAtUtc = DateTimeOffset.UtcNow
+            });
         }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public static string CreateDedupHash(string title, string url, DateTimeOffset publishedAtUtc, string sourceCode)
@@ -65,10 +96,9 @@ public sealed class NewsIngestionPipeline(
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
     }
 
-    private async Task<NewsSource> GetSourceAsync(
+    private NewsSource GetOrCreateSource(
         string sourceCode,
-        Dictionary<string, NewsSource> sources,
-        CancellationToken cancellationToken)
+        Dictionary<string, NewsSource> sources)
     {
         var normalizedSourceCode = sourceCode.Trim().ToLowerInvariant();
         if (sources.TryGetValue(normalizedSourceCode, out var cachedSource))
@@ -76,20 +106,13 @@ public sealed class NewsIngestionPipeline(
             return cachedSource;
         }
 
-        var source = await dbContext.NewsSources.SingleOrDefaultAsync(
-            item => item.SourceCode == normalizedSourceCode,
-            cancellationToken);
-        source ??= new NewsSource
+        var source = new NewsSource
         {
             SourceCode = normalizedSourceCode,
             SourceName = normalizedSourceCode,
             IsEnabled = true
         };
-
-        if (source.Id == 0)
-        {
-            dbContext.NewsSources.Add(source);
-        }
+        dbContext.NewsSources.Add(source);
 
         sources[normalizedSourceCode] = source;
         return source;

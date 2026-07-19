@@ -19,7 +19,7 @@ public sealed class NewsOutboxEventConfiguration : IEntityTypeConfiguration<News
         builder.Property(outboxEvent => outboxEvent.LastError).HasColumnName("last_error");
         builder.Property(outboxEvent => outboxEvent.CreatedAtUtc).HasColumnName("created_at_utc");
         builder.HasIndex(outboxEvent => new { outboxEvent.DeliveredAtUtc, outboxEvent.NextAttemptAtUtc });
-        builder.HasOne<StockNews>()
+        builder.HasOne(outboxEvent => outboxEvent.News)
             .WithOne()
             .HasForeignKey<NewsOutboxEvent>(outboxEvent => outboxEvent.NewsId)
             .OnDelete(DeleteBehavior.Cascade);

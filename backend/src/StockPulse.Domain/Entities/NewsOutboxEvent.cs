@@ -6,6 +6,7 @@ public sealed class NewsOutboxEvent
 {
     public Guid EventId { get; set; }
     public long NewsId { get; set; }
+    public StockNews News { get; set; } = null!;
     public JsonDocument Payload { get; set; } = JsonDocument.Parse("{}");
     public int AttemptCount { get; set; }
     public DateTimeOffset NextAttemptAtUtc { get; set; }

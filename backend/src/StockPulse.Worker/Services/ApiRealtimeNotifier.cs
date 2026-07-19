@@ -10,8 +10,9 @@ public sealed partial class ApiRealtimeNotifier(
     ILogger<ApiRealtimeNotifier> logger) : INewsCreatedNotifier
 {
     private const string InternalKeyHeaderName = "X-StockPulse-Internal-Key";
+    private const string EventIdHeaderName = "X-StockPulse-Event-Id";
 
-    public async Task NotifyAsync(NewsCreatedEvent message, CancellationToken cancellationToken)
+    public async Task NotifyAsync(Guid eventId, NewsCreatedEvent message, CancellationToken cancellationToken)
     {
         var sharedKey = configuration["RealtimeApi:SharedKey"]
             ?? throw new InvalidOperationException("RealtimeApi:SharedKey must be configured.");
@@ -21,6 +22,7 @@ public sealed partial class ApiRealtimeNotifier(
             Content = JsonContent.Create(message)
         };
         request.Headers.Add(InternalKeyHeaderName, sharedKey);
+        request.Headers.Add(EventIdHeaderName, eventId.ToString());
 
         using var response = await httpClient.SendAsync(request, cancellationToken);
         if (response.IsSuccessStatusCode)
