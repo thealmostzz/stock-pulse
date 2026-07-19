@@ -3,7 +3,10 @@ import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 
 import { ApiValidationError } from '../models/api-problem-details';
+import { environment } from '../../../environments/environment.development';
 import { NewsApiService } from './news-api.service';
+
+const latestNewsEndpoint = `${environment.apiBaseUrl}/api/news/latest`;
 
 describe('NewsApiService', () => {
   beforeEach(() => {
@@ -18,7 +21,7 @@ describe('NewsApiService', () => {
 
     service.getLatest().subscribe();
 
-    const request = httpTesting.expectOne('http://localhost:5179/api/news/latest?limit=30');
+    const request = httpTesting.expectOne(`${latestNewsEndpoint}?limit=30`);
     expect(request.request.method).toBe('GET');
     request.flush([]);
     httpTesting.verify();
@@ -37,7 +40,7 @@ describe('NewsApiService', () => {
       },
     });
 
-    const request = httpTesting.expectOne('http://localhost:5179/api/news/latest?limit=0');
+    const request = httpTesting.expectOne(`${latestNewsEndpoint}?limit=0`);
     request.flush(
       { title: 'One or more query parameters are invalid.', status: 400, errors: { limit: ['must be between 1 and 200'] } },
       { status: 400, statusText: 'Bad Request' },

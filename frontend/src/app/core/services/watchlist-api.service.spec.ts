@@ -3,7 +3,10 @@ import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 
 import { ApiValidationError } from '../models/api-problem-details';
+import { environment } from '../../../environments/environment.development';
 import { WatchlistApiService } from './watchlist-api.service';
+
+const watchlistEndpoint = `${environment.apiBaseUrl}/api/watchlist`;
 
 describe('WatchlistApiService', () => {
   beforeEach(() => {
@@ -18,7 +21,7 @@ describe('WatchlistApiService', () => {
 
     service.getAll().subscribe();
 
-    const request = httpTesting.expectOne('http://localhost:5179/api/watchlist');
+    const request = httpTesting.expectOne(watchlistEndpoint);
     expect(request.request.method).toBe('GET');
     request.flush([]);
     httpTesting.verify();
@@ -31,7 +34,7 @@ describe('WatchlistApiService', () => {
 
     service.add(requestBody).subscribe();
 
-    const request = httpTesting.expectOne('http://localhost:5179/api/watchlist');
+    const request = httpTesting.expectOne(watchlistEndpoint);
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual(requestBody);
     request.flush({});
@@ -44,7 +47,7 @@ describe('WatchlistApiService', () => {
 
     service.remove('BRK/B').subscribe();
 
-    const request = httpTesting.expectOne('http://localhost:5179/api/watchlist/BRK%2FB');
+    const request = httpTesting.expectOne(`${watchlistEndpoint}/BRK%2FB`);
     expect(request.request.method).toBe('DELETE');
     request.flush(null);
     httpTesting.verify();
@@ -63,7 +66,7 @@ describe('WatchlistApiService', () => {
       },
     });
 
-    const request = httpTesting.expectOne('http://localhost:5179/api/watchlist');
+    const request = httpTesting.expectOne(watchlistEndpoint);
     request.flush(
       { title: 'Ticker is required.', status: 400 },
       { status: 400, statusText: 'Bad Request' },
@@ -83,7 +86,7 @@ describe('WatchlistApiService', () => {
       },
     });
 
-    const request = httpTesting.expectOne('http://localhost:5179/api/watchlist');
+    const request = httpTesting.expectOne(watchlistEndpoint);
     request.flush(
       { title: 'Ticker is required.', status: 400, errors: null },
       { status: 400, statusText: 'Bad Request' },

@@ -61,7 +61,9 @@ function isOptionalValidationErrors(value: unknown): boolean {
     return false;
   }
 
-  return Object.values(value).every(
-    (messages) => Array.isArray(messages) && messages.every((message) => typeof message === 'string'),
-  );
+  return Object.entries(value).every(([, messages]) => isStringArray(messages));
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((message) => typeof message === 'string');
 }
