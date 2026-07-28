@@ -9,3 +9,4 @@ TestResults/
 appsettings.Development.local.json
 *.user
 *.suo
+.worktrees/
