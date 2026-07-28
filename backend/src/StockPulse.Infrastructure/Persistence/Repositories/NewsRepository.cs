@@ -46,6 +46,13 @@ public sealed class NewsRepository(StockPulseDbContext dbContext) : INewsReposit
             query = query.Where(news => news.Tags.Contains(request.Tag.Trim()));
         }
 
+        if (request.WatchlistOnly)
+        {
+            query = query.Where(news => news.Tickers.Any(newsTicker =>
+                dbContext.WatchlistItems.Any(watchlistItem =>
+                    watchlistItem.IsActive && watchlistItem.Ticker == newsTicker.Ticker)));
+        }
+
         var totalCount = await query.CountAsync(cancellationToken);
         var skip = ((long)request.Page - 1) * request.PageSize;
         if (skip is < 0 or > int.MaxValue)
@@ -53,9 +60,7 @@ public sealed class NewsRepository(StockPulseDbContext dbContext) : INewsReposit
             throw new ArgumentOutOfRangeException(nameof(request));
         }
 
-        var items = await query
-            .OrderByDescending(news => news.PublishedAtUtc)
-            .ThenByDescending(news => news.Id)
+        var items = await ApplyOrdering(query, request.SortBy ?? "publishedAt")
             .Skip((int)skip)
             .Take(request.PageSize)
             .Select(ProjectNews())
@@ -72,6 +77,16 @@ public sealed class NewsRepository(StockPulseDbContext dbContext) : INewsReposit
     private IQueryable<StockNews> CreateBaseQuery() =>
         dbContext.StockNews
             .AsNoTracking();
+
+    private static IOrderedQueryable<StockNews> ApplyOrdering(IQueryable<StockNews> query, string sortBy) =>
+        sortBy == "impact"
+            ? query
+                .OrderByDescending(news => news.ImpactScore)
+                .ThenByDescending(news => news.PublishedAtUtc)
+                .ThenByDescending(news => news.Id)
+            : query
+                .OrderByDescending(news => news.PublishedAtUtc)
+                .ThenByDescending(news => news.Id);
 
     private static Expression<Func<StockNews, NewsProjection>> ProjectNews() =>
         news => new NewsProjection(

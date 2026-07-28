@@ -41,7 +41,8 @@ public sealed class NewsControllerTests
         new NewsQueryRequest(null, null, "mixed", null),
         new NewsQueryRequest(null, null, null, null, 0),
         new NewsQueryRequest(null, null, null, null, 1, 201),
-        new NewsQueryRequest(null, null, null, null, int.MaxValue, 2)
+        new NewsQueryRequest(null, null, null, null, int.MaxValue, 2),
+        new NewsQueryRequest(null, null, null, null, SortBy: "title")
     };
 #pragma warning restore CA1707
 }

@@ -38,6 +38,49 @@ public sealed class NewsQueryServiceTests
     }
 
     [Fact]
+    public async Task QueryAsync_DefaultsMissingSortByToPublishedAt()
+    {
+        var repository = new CapturingNewsRepository();
+        var service = new NewsQueryService(repository);
+
+        await service.QueryAsync(new NewsQueryRequest(null, null, null, null), CancellationToken.None);
+
+        Assert.Equal("publishedAt", repository.LastRequest!.SortBy);
+    }
+
+    [Fact]
+    public async Task QueryAsync_NormalizesPublishedAtSortByToCanonicalValue()
+    {
+        var repository = new CapturingNewsRepository();
+        var service = new NewsQueryService(repository);
+
+        await service.QueryAsync(new NewsQueryRequest(null, null, null, null, SortBy: "publishedAt"), CancellationToken.None);
+
+        Assert.Equal("publishedAt", repository.LastRequest!.SortBy);
+    }
+
+    [Fact]
+    public async Task QueryAsync_NormalizesSortByToImpact()
+    {
+        var repository = new CapturingNewsRepository();
+        var service = new NewsQueryService(repository);
+
+        await service.QueryAsync(new NewsQueryRequest(null, null, null, null, SortBy: " IMPACT "), CancellationToken.None);
+
+        Assert.Equal("impact", repository.LastRequest!.SortBy);
+    }
+
+    [Fact]
+    public async Task QueryAsync_RejectsUnsupportedSortBy()
+    {
+        var service = NewsQueryService.CreateForTest();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.QueryAsync(
+            new NewsQueryRequest(null, null, null, null, SortBy: "title"),
+            CancellationToken.None));
+    }
+
+    [Fact]
     public async Task QueryAsync_RejectsUnsupportedSentiment()
     {
         var service = NewsQueryService.CreateForTest();
