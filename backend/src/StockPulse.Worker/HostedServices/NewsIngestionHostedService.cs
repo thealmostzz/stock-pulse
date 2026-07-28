@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Options;
+using StockPulse.Worker.Configuration;
 using StockPulse.Worker.Pipelines;
 using StockPulse.Worker.Providers;
 using StockPulse.Worker.Services;
@@ -6,12 +8,12 @@ namespace StockPulse.Worker.HostedServices;
 
 public sealed partial class NewsIngestionHostedService(
     IServiceScopeFactory scopeFactory,
-    IEnumerable<IProviderNewsClient> providers,
+    IOptions<WorkerOptions> workerOptions,
     ILogger<NewsIngestionHostedService> logger) : BackgroundService
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
+        using var timer = new PeriodicTimer(workerOptions.Value.GetPollingInterval());
 
         do
         {
@@ -36,6 +38,7 @@ public sealed partial class NewsIngestionHostedService(
         using var scope = scopeFactory.CreateScope();
         var pipeline = scope.ServiceProvider.GetRequiredService<NewsIngestionPipeline>();
         var dispatcher = scope.ServiceProvider.GetRequiredService<OutboxDispatcher>();
+        var providers = scope.ServiceProvider.GetRequiredService<IEnumerable<IProviderNewsClient>>();
 
         await dispatcher.DispatchPendingAsync(cancellationToken);
 
