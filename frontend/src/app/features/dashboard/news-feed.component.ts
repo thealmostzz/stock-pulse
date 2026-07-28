@@ -29,7 +29,7 @@ import { NewsCardComponent } from './news-card.component';
       } @else if (items().length === 0) {
         <p class="news-feed__empty" role="status">เพิ่มหุ้นใน Watchlist เพื่อเริ่มติดตามข่าว</p>
       } @else {
-        <cdk-virtual-scroll-viewport class="news-feed__viewport" itemSize="154" role="list" aria-label="Latest market news">
+        <cdk-virtual-scroll-viewport class="news-feed__viewport" itemSize="154" aria-label="Latest market news">
           <sp-news-card
             *cdkVirtualFor="let item of items(); let index = index; trackBy: trackByNewsId"
             [item]="item"
