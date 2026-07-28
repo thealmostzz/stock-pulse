@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, Inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, ElementRef, HostListener, Inject, OnInit, signal, ViewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HubConnectionState } from '@microsoft/signalr';
 import { filter, finalize, bufferTime } from 'rxjs';
@@ -7,15 +7,17 @@ import { NewsCreatedEvent, NewsItem } from '../../core/models/news-item';
 import { NewsApiService } from '../../core/services/news-api.service';
 import { NewsHubService } from '../../core/services/news-hub.service';
 import { NewsFeedComponent } from './news-feed.component';
+import { NewsInspectorComponent } from './news-inspector.component';
 import { WatchlistPanelComponent } from '../watchlist/watchlist-panel.component';
 
 const maxNewsItems = 300;
 const initialNewsLimit = 30;
+const desktopLayoutMinWidth = 720;
 
 @Component({
   selector: 'sp-dashboard',
   standalone: true,
-  imports: [NewsFeedComponent, WatchlistPanelComponent],
+  imports: [NewsFeedComponent, NewsInspectorComponent, WatchlistPanelComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -24,7 +26,10 @@ export class DashboardComponent implements OnInit {
   private readonly receivedEventIds = new Set<string>();
   private readonly receivedEventIdOrder: string[] = [];
 
+  @ViewChild('watchlistDisclosure') private watchlistDisclosure?: ElementRef<HTMLDetailsElement>;
+
   readonly items = signal<NewsItem[]>([]);
+  readonly selectedNews = signal<NewsItem | null>(null);
   readonly isLoading = signal(true);
   readonly connectionState = computed(() => this.newsHub?.connectionState() ?? HubConnectionState.Disconnected);
 
@@ -64,6 +69,19 @@ export class DashboardComponent implements OnInit {
 
   prependNews(news: NewsItem): void {
     this.items.update((current) => [news, ...current].slice(0, maxNewsItems));
+  }
+
+  selectNews(news: NewsItem): void {
+    this.selectedNews.set(news);
+  }
+
+  @HostListener('window:resize')
+  ensureWatchlistVisibleOnDesktop(): void {
+    const disclosure = this.watchlistDisclosure?.nativeElement;
+
+    if (window.innerWidth >= desktopLayoutMinWidth && disclosure && !disclosure.open) {
+      disclosure.open = true;
+    }
   }
 
   trackByNewsId(_: number, item: NewsItem): number {
