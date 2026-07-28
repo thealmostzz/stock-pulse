@@ -44,12 +44,22 @@ public sealed class NewsQueryService(INewsRepository repository)
             throw new ArgumentException("Sentiment is invalid.", nameof(request));
         }
 
+        var sortBy = string.IsNullOrWhiteSpace(request.SortBy)
+            ? "publishedAt"
+            : request.SortBy.Trim().ToLowerInvariant();
+        if (sortBy is not ("publishedAt" or "impact"))
+        {
+            throw new ArgumentException("SortBy is invalid.", nameof(request));
+        }
+
         var normalizedRequest = request with
         {
             Ticker = request.Ticker is null ? null : TickerNormalizer.Normalize(request.Ticker),
             SourceCode = string.IsNullOrWhiteSpace(request.SourceCode)
                 ? null
                 : request.SourceCode.Trim().ToLowerInvariant(),
+            SortBy = sortBy,
+            WatchlistOnly = request.WatchlistOnly,
         };
 
         return repository.QueryAsync(normalizedRequest, cancellationToken);
