@@ -8,7 +8,6 @@ namespace StockPulse.Worker.HostedServices;
 
 public sealed partial class NewsIngestionHostedService(
     IServiceScopeFactory scopeFactory,
-    IEnumerable<IProviderNewsClient> providers,
     IOptions<WorkerOptions> workerOptions,
     ILogger<NewsIngestionHostedService> logger) : BackgroundService
 {
@@ -39,6 +38,7 @@ public sealed partial class NewsIngestionHostedService(
         using var scope = scopeFactory.CreateScope();
         var pipeline = scope.ServiceProvider.GetRequiredService<NewsIngestionPipeline>();
         var dispatcher = scope.ServiceProvider.GetRequiredService<OutboxDispatcher>();
+        var providers = scope.ServiceProvider.GetRequiredService<IEnumerable<IProviderNewsClient>>();
 
         await dispatcher.DispatchPendingAsync(cancellationToken);
 

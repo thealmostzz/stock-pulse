@@ -3,9 +3,6 @@ using StockPulse.Worker;
 using StockPulse.Worker.Configuration;
 using StockPulse.Worker.HostedServices;
 using StockPulse.Worker.Pipelines;
-using StockPulse.Worker.Providers;
-using StockPulse.Worker.Providers.Finnhub;
-using StockPulse.Worker.Providers.Mock;
 using StockPulse.Worker.Services;
 
 var builder = Host.CreateApplicationBuilder(args);
@@ -28,14 +25,7 @@ builder.Services.Configure<FinnhubOptions>(builder.Configuration.GetSection("Fin
 builder.Services.AddHttpClient<ApiRealtimeNotifier>(client => client.BaseAddress = new Uri(realtimeApiBaseUrl));
 builder.Services.AddHttpClient("Finnhub", client => client.BaseAddress = new Uri("https://finnhub.io/api/v1/"));
 builder.Services.AddScoped<INewsCreatedNotifier>(serviceProvider => serviceProvider.GetRequiredService<ApiRealtimeNotifier>());
-if (workerOptions.UseMockProviders)
-{
-    builder.Services.AddSingleton<IProviderNewsClient, MockNewsClient>();
-}
-else
-{
-    builder.Services.AddScoped<IProviderNewsClient, FinnhubNewsClient>();
-}
+builder.Services.AddSelectedNewsProvider(workerOptions);
 builder.Services.AddScoped<NewsIngestionPipeline>();
 builder.Services.AddScoped<OutboxDispatcher>();
 builder.Services.AddHostedService<NewsIngestionHostedService>();
