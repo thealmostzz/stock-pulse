@@ -3,10 +3,12 @@ import { provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 
 import { ApiValidationError } from '../models/api-problem-details';
+import { NewsQuery } from '../models/news-query';
 import { environment } from '../../../environments/environment.development';
 import { NewsApiService } from './news-api.service';
 
 const latestNewsEndpoint = `${environment.apiBaseUrl}/api/news/latest`;
+const newsEndpoint = `${environment.apiBaseUrl}/api/news`;
 
 describe('NewsApiService', () => {
   beforeEach(() => {
@@ -24,6 +26,36 @@ describe('NewsApiService', () => {
     const request = httpTesting.expectOne(`${latestNewsEndpoint}?limit=30`);
     expect(request.request.method).toBe('GET');
     request.flush([]);
+    httpTesting.verify();
+  });
+
+  it('queries paged news with the supplied filters and sort order', () => {
+    const service = TestBed.inject(NewsApiService);
+    const httpTesting = TestBed.inject(HttpTestingController);
+    const query: NewsQuery = {
+      ticker: 'NVDA',
+      sourceCode: 'mock',
+      sentiment: 'Positive',
+      tag: 'earnings',
+      page: 2,
+      pageSize: 30,
+      sortBy: 'impact',
+      watchlistOnly: true,
+    };
+
+    service.query(query).subscribe();
+
+    const request = httpTesting.expectOne((candidate) => candidate.url === newsEndpoint);
+    expect(request.request.method).toBe('GET');
+    expect(request.request.params.get('ticker')).toBe('NVDA');
+    expect(request.request.params.get('sourceCode')).toBe('mock');
+    expect(request.request.params.get('sentiment')).toBe('Positive');
+    expect(request.request.params.get('tag')).toBe('earnings');
+    expect(request.request.params.get('sortBy')).toBe('impact');
+    expect(request.request.params.get('watchlistOnly')).toBe('true');
+    expect(request.request.params.get('page')).toBe('2');
+    expect(request.request.params.get('pageSize')).toBe('30');
+    request.flush({ items: [], page: 2, pageSize: 30, totalCount: 0, hasMore: false });
     httpTesting.verify();
   });
 
