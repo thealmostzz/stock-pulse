@@ -1,9 +1,14 @@
 :root {
-  --sp-bg: #081017;
-  --sp-surface: #101c27;
-  --sp-border: #233547;
-  --sp-text: #e8f1f7;
-  --sp-muted: #93a8b8;
+  --sp-bg: #08111f;
+  --sp-surface: #0d1929;
+  --sp-surface-raised: #122137;
+  --sp-border: #253a55;
+  --sp-text: #edf4ff;
+  --sp-muted: #a6b6cc;
+  --sp-accent: #63a4ff;
+  --sp-focus-ring: #91c0ff;
+  --sp-radius-md: .75rem;
+  --sp-motion-fast: 180ms;
   --sp-positive: #33d17a;
   --sp-negative: #ff6464;
   --sp-warning: #f5b942;

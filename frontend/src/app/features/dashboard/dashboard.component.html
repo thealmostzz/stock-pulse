@@ -1,7 +1,10 @@
 <main class="dashboard" aria-label="Stock Pulse operating dashboard">
-  <aside class="dashboard__sidebar" aria-label="Watchlist">
-    <sp-watchlist-panel />
-  </aside>
+  <details class="dashboard__watchlist" open>
+    <summary>Watchlist</summary>
+    <div class="dashboard__watchlist-content" aria-label="Watchlist">
+      <sp-watchlist-panel />
+    </div>
+  </details>
 
   <section class="dashboard__feed" aria-label="Realtime news feed">
     <sp-news-feed [items]="items()" [isLoading]="isLoading()" [connectionState]="connectionState()" />

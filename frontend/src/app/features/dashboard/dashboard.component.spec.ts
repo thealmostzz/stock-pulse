@@ -1,11 +1,44 @@
 import { DestroyRef } from '@angular/core';
-import { fakeAsync, tick } from '@angular/core/testing';
-import { Subject } from 'rxjs';
+import { fakeAsync, TestBed, tick } from '@angular/core/testing';
+import { HubConnectionState } from '@microsoft/signalr';
+import { of, Subject } from 'rxjs';
 
 import { NewsCreatedEvent, NewsItem } from '../../core/models/news-item';
+import { NewsApiService } from '../../core/services/news-api.service';
+import { NewsHubService } from '../../core/services/news-hub.service';
+import { WatchlistApiService } from '../../core/services/watchlist-api.service';
 import { DashboardComponent } from './dashboard.component';
 
 describe('DashboardComponent', () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [DashboardComponent],
+      providers: [
+        { provide: NewsApiService, useValue: { getLatest: () => of([]) } },
+        {
+          provide: NewsHubService,
+          useValue: {
+            newsCreated$: of(),
+            connect: () => Promise.resolve(),
+            connectionState: () => HubConnectionState.Disconnected,
+          },
+        },
+        { provide: WatchlistApiService, useValue: { getAll: () => of([]) } },
+      ],
+    });
+  });
+
+  it('keeps the watchlist reachable through an accessible disclosure', () => {
+    const fixture = TestBed.createComponent(DashboardComponent);
+    fixture.detectChanges();
+
+    const summary = fixture.nativeElement.querySelector('summary') as HTMLElement;
+    const feed = fixture.nativeElement.querySelector('[aria-label="Realtime news feed"]') as HTMLElement;
+
+    expect(summary.textContent?.trim()).toContain('Watchlist');
+    expect(feed).not.toBeNull();
+  });
+
   it('loads the initial feed with the API default limit while retaining the larger in-memory cap', async () => {
     const initialNews = new Subject<NewsItem[]>();
     const hubEvents = new Subject<NewsCreatedEvent>();
