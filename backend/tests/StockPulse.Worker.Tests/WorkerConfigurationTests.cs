@@ -1,6 +1,8 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using StockPulse.Infrastructure.Persistence;
 using StockPulse.Worker.Configuration;
 using StockPulse.Worker.HostedServices;
 using StockPulse.Worker.Providers;
@@ -61,6 +63,7 @@ public sealed class WorkerConfigurationTests
         workerOptions.Validate(finnhubOptions);
         builder.Services.Configure<WorkerOptions>(builder.Configuration.GetSection("Worker"));
         builder.Services.Configure<FinnhubOptions>(builder.Configuration.GetSection("Finnhub"));
+        builder.Services.AddScoped(_ => new StockPulseDbContext(new DbContextOptions<StockPulseDbContext>()));
         builder.Services.AddHttpClient("Finnhub", client => client.BaseAddress = new Uri("https://finnhub.io/api/v1/"));
 
         builder.Services.AddSelectedNewsProvider(workerOptions);
