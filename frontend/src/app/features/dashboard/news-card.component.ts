@@ -38,14 +38,14 @@ import { NewsItem } from '../../core/models/news-item';
     </article>
   `,
   styles: `
-    .news-card { height: 154px; overflow: hidden; padding: 1rem 1.5rem; border-bottom: 1px solid var(--sp-border); outline: none; cursor: pointer; }
+    .news-card { height: 154px; overflow: hidden; padding: 1rem 1.5rem; border-bottom: 1px solid var(--sp-border); outline: none; cursor: pointer; transition: background-color var(--sp-motion-fast), box-shadow var(--sp-motion-fast); }
     .news-card:focus-visible { outline: 2px solid var(--sp-positive); outline-offset: -2px; }
     .news-card--selected { background: color-mix(in srgb, var(--sp-positive) 9%, transparent); box-shadow: inset 3px 0 0 var(--sp-positive); }
     .news-card--new { animation: new-news 1.2s ease-out; }
     .news-card__meta, .news-card__footer, .news-card__signals, .news-card__tickers { display: flex; align-items: center; gap: .6rem; }
     .news-card__meta { color: var(--sp-muted); font-size: .67rem; letter-spacing: .08em; text-transform: uppercase; }
     time { margin-left: auto; letter-spacing: normal; text-transform: none; }
-    .news-card__title { display: block; margin: .45rem 0; color: var(--sp-text); font-size: .95rem; font-weight: 700; line-height: 1.4; }
+    .news-card__title { margin: .45rem 0; color: var(--sp-text); font-size: .95rem; font-weight: 700; line-height: 1.4; transition: color var(--sp-motion-fast) ease; }
     .news-card:hover .news-card__title { color: var(--sp-positive); }
     .news-card__summary { display: -webkit-box; overflow: hidden; margin: 0 0 .75rem; color: var(--sp-muted); font-size: .78rem; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
     .news-card__footer { justify-content: space-between; font-size: .68rem; }
@@ -56,7 +56,7 @@ import { NewsItem } from '../../core/models/news-item';
     .news-card__signals .negative { color: var(--sp-negative); border-color: color-mix(in srgb, var(--sp-negative) 55%, var(--sp-border)); }
     .news-card__signals .neutral { color: var(--sp-warning); }
     @keyframes new-news { from { background: color-mix(in srgb, var(--sp-positive) 13%, transparent); } to { background: transparent; } }
-    @media (prefers-reduced-motion: reduce) { .news-card--new { animation: none; } }
+    @media (prefers-reduced-motion: reduce) { .news-card, .news-card__title { transition: none; } .news-card--new { animation: none; } }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

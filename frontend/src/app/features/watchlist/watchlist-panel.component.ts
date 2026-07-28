@@ -19,7 +19,12 @@ const validTicker = /^[A-Z][A-Z0-9.-]{0,19}$/;
         <label for="watchlist-ticker">เพิ่มหุ้น</label>
         <div>
           <input id="watchlist-ticker" name="ticker" [(ngModel)]="ticker" maxlength="20" autocomplete="off" placeholder="เช่น NVDA" />
-          <button type="submit" [disabled]="isSaving()">+</button>
+          <button
+            type="submit"
+            [disabled]="isSaving()"
+            [attr.aria-busy]="isSaving()"
+            [attr.aria-label]="isSaving() ? 'กำลังเพิ่มหุ้น' : 'เพิ่มหุ้นใน Watchlist'"
+          >เพิ่ม</button>
         </div>
       </form>
       @if (errorMessage()) { <p class="watchlist__error" role="alert">{{ errorMessage() }}</p> }
@@ -40,7 +45,27 @@ const validTicker = /^[A-Z][A-Z0-9.-]{0,19}$/;
     </section>
   `,
   styles: `
-    .watchlist { padding: 1.4rem 1rem; } header p { margin: 0 0 .35rem; color: var(--sp-muted); font-size: .63rem; font-weight: 700; letter-spacing: .12em; } h2 { margin: 0; font-size: 1rem; } .watchlist__form { margin: 1.6rem 0 1rem; } label { display: block; margin-bottom: .4rem; color: var(--sp-muted); font-size: .72rem; } .watchlist__form div { display: flex; } input { min-width: 0; width: 100%; border: 1px solid var(--sp-border); border-radius: .3rem 0 0 .3rem; background: var(--sp-bg); color: var(--sp-text); padding: .55rem .6rem; font: inherit; font-size: .78rem; } button { border: 1px solid var(--sp-border); background: var(--sp-surface); color: var(--sp-text); cursor: pointer; } .watchlist__form button { width: 2.2rem; border-left: 0; border-radius: 0 .3rem .3rem 0; font-size: 1.05rem; } button:focus-visible, input:focus-visible { outline: 2px solid var(--sp-positive); outline-offset: 2px; } button:disabled { cursor: wait; opacity: .55; } ul { display: grid; gap: .3rem; margin: 0; padding: 0; list-style: none; } li { display: flex; align-items: center; justify-content: space-between; padding: .65rem .1rem; border-bottom: 1px solid var(--sp-border); } strong, small { display: block; } strong { font-size: .78rem; } small { margin-top: .2rem; color: var(--sp-muted); font-size: .66rem; } li button { width: 1.55rem; height: 1.55rem; border-radius: .25rem; color: var(--sp-muted); } li button:hover { color: var(--sp-negative); } .watchlist__error { color: var(--sp-negative); font-size: .72rem; line-height: 1.4; } .watchlist__state { margin: .8rem 0; color: var(--sp-muted); font-size: .72rem; line-height: 1.4; }
+    .watchlist { padding: 1.4rem 1rem; }
+    header p { margin: 0 0 .35rem; color: var(--sp-muted); font-size: .63rem; font-weight: 700; letter-spacing: .12em; }
+    h2 { margin: 0; font-size: 1rem; }
+    .watchlist__form { margin: 1.6rem 0 1rem; }
+    label { display: block; margin-bottom: .4rem; color: var(--sp-muted); font-size: .72rem; }
+    .watchlist__form div { display: flex; }
+    input { min-width: 0; min-height: 2.75rem; width: 100%; border: 1px solid var(--sp-border); border-radius: .3rem 0 0 .3rem; background: var(--sp-bg); color: var(--sp-text); padding: .55rem .6rem; font: inherit; font-size: .78rem; transition: border-color var(--sp-motion-fast) ease, background-color var(--sp-motion-fast) ease; }
+    button { border: 1px solid var(--sp-border); background: var(--sp-surface); color: var(--sp-text); cursor: pointer; transition: color var(--sp-motion-fast) ease, border-color var(--sp-motion-fast) ease, background-color var(--sp-motion-fast) ease; }
+    .watchlist__form button { min-width: 3.5rem; min-height: 2.75rem; border-left: 0; border-radius: 0 .3rem .3rem 0; font: inherit; font-size: .72rem; font-weight: 700; }
+    .watchlist__form button:not(:disabled):hover { background: var(--sp-positive); color: var(--sp-bg); }
+    button:focus-visible, input:focus-visible { outline: 2px solid var(--sp-focus-ring); outline-offset: 2px; }
+    button:disabled { cursor: wait; opacity: .55; }
+    ul { display: grid; gap: .3rem; margin: 0; padding: 0; list-style: none; }
+    li { display: flex; align-items: center; justify-content: space-between; padding: .65rem .1rem; border-bottom: 1px solid var(--sp-border); }
+    strong, small { display: block; }
+    strong { font-size: .78rem; }
+    small { margin-top: .2rem; color: var(--sp-muted); font-size: .66rem; }
+    li button { min-width: 2.75rem; min-height: 2.75rem; border-radius: .25rem; color: var(--sp-muted); }
+    li button:not(:disabled):hover { border-color: var(--sp-negative); color: var(--sp-negative); }
+    .watchlist__error { margin: .8rem 0; border-left: 2px solid var(--sp-negative); padding-left: .55rem; color: var(--sp-negative); font-size: .72rem; line-height: 1.4; }
+    .watchlist__state { margin: .8rem 0; color: var(--sp-muted); font-size: .72rem; line-height: 1.4; }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

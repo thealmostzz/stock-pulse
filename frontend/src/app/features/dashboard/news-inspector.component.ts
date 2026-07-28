@@ -56,7 +56,10 @@ import { NewsItem } from '../../core/models/news-item';
     .news-inspector__signals div { border: 1px solid var(--sp-border); border-radius: .35rem; padding: .55rem; }
     dt { color: var(--sp-muted); font-size: .65rem; letter-spacing: .08em; text-transform: uppercase; }
     dd { margin: .3rem 0 0; font-size: .8rem; font-weight: 700; }
-    a { color: var(--sp-positive); font-size: .81rem; font-weight: 700; }
+    a { display: inline-flex; align-items: center; min-height: 2.75rem; color: var(--sp-positive); font-size: .81rem; font-weight: 700; transition: color var(--sp-motion-fast) ease; }
+    a:hover { color: var(--sp-focus-ring); }
+    a:focus-visible { outline: 2px solid var(--sp-focus-ring); outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) { a { transition: none; } }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

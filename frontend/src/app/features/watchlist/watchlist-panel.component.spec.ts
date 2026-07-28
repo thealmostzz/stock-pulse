@@ -37,6 +37,16 @@ describe('WatchlistPanelComponent', () => {
 
     expect(add).toHaveBeenCalledWith({ ticker: 'A1234567890123456789', displayName: null, market: null });
   });
+
+  it('disables the add control while a ticker request is in progress', () => {
+    const fixture = TestBed.createComponent(WatchlistPanelComponent);
+    fixture.componentInstance.isSaving.set(true);
+    fixture.detectChanges();
+
+    const button = fixture.nativeElement.querySelector('.watchlist__form button') as HTMLButtonElement;
+    expect(button.disabled).toBeTrue();
+    expect(button.getAttribute('aria-label')).toContain('กำลังเพิ่มหุ้น');
+  });
 });
 
 function createComponent(): WatchlistPanelComponent {
