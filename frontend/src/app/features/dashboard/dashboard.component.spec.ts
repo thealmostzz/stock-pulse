@@ -6,6 +6,26 @@ import { NewsCreatedEvent, NewsItem } from '../../core/models/news-item';
 import { DashboardComponent } from './dashboard.component';
 
 describe('DashboardComponent', () => {
+  it('loads the initial feed with the API default limit while retaining the larger in-memory cap', async () => {
+    const initialNews = new Subject<NewsItem[]>();
+    const hubEvents = new Subject<NewsCreatedEvent>();
+    let requestedLimit: number | undefined;
+    const component = new DashboardComponent(
+      createDestroyRef(),
+      {
+        getLatest: (limit: number) => {
+          requestedLimit = limit;
+          return initialNews.asObservable();
+        },
+      } as never,
+      { newsCreated$: hubEvents.asObservable(), connect: () => Promise.resolve() } as never,
+    );
+
+    await component.ngOnInit();
+
+    expect(requestedLimit).toBe(30);
+  });
+
   it('caps 301 realtime news items at 300', () => {
     const component = new DashboardComponent();
 

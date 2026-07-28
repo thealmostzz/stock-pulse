@@ -10,6 +10,7 @@ import { NewsFeedComponent } from './news-feed.component';
 import { WatchlistPanelComponent } from '../watchlist/watchlist-panel.component';
 
 const maxNewsItems = 300;
+const initialNewsLimit = 30;
 
 @Component({
   selector: 'sp-dashboard',
@@ -39,7 +40,7 @@ export class DashboardComponent implements OnInit {
       return;
     }
 
-    this.newsApi.getLatest(maxNewsItems)
+    this.newsApi.getLatest(initialNewsLimit)
       .pipe(
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.isLoading.set(false)),

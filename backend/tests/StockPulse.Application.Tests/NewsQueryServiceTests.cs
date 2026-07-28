@@ -27,6 +27,17 @@ public sealed class NewsQueryServiceTests
     }
 
     [Fact]
+    public async Task QueryAsync_NormalizesSourceCodeBeforeQueryingRepository()
+    {
+        var repository = new CapturingNewsRepository();
+        var service = new NewsQueryService(repository);
+
+        await service.QueryAsync(new NewsQueryRequest(null, " Mock ", null, null), CancellationToken.None);
+
+        Assert.Equal("mock", repository.LastRequest!.SourceCode);
+    }
+
+    [Fact]
     public async Task QueryAsync_RejectsUnsupportedSentiment()
     {
         var service = NewsQueryService.CreateForTest();

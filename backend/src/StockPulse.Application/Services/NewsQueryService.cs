@@ -44,9 +44,13 @@ public sealed class NewsQueryService(INewsRepository repository)
             throw new ArgumentException("Sentiment is invalid.", nameof(request));
         }
 
-        var normalizedRequest = request.Ticker is null
-            ? request
-            : request with { Ticker = TickerNormalizer.Normalize(request.Ticker) };
+        var normalizedRequest = request with
+        {
+            Ticker = request.Ticker is null ? null : TickerNormalizer.Normalize(request.Ticker),
+            SourceCode = string.IsNullOrWhiteSpace(request.SourceCode)
+                ? null
+                : request.SourceCode.Trim().ToLowerInvariant(),
+        };
 
         return repository.QueryAsync(normalizedRequest, cancellationToken);
     }

@@ -10,7 +10,7 @@ public sealed class SignalRRealtimePublisherTests
 {
 #pragma warning disable CA1707 // Keep the descriptive test name required by the task specification.
     [Fact]
-    public async Task PublishNewsCreatedAsync_SendsOneEventPerConnection()
+    public async Task PublishNewsCreatedAsync_SendsGlobalAndNormalizedDistinctTickerGroups()
     {
         var client = new RecordingClientProxy();
         var clients = DispatchProxy.Create<IHubClients, HubClientsProxy>();
@@ -22,12 +22,13 @@ public sealed class SignalRRealtimePublisherTests
         var message = new NewsCreatedEvent(
             eventId,
             DateTimeOffset.UtcNow,
-            new NewsResponseDto(1, "Title", null, "source", "https://example.test/news", DateTimeOffset.UtcNow, ["NVDA"], "Neutral", 0m, []));
+            new NewsResponseDto(1, "Title", null, "source", "https://example.test/news", DateTimeOffset.UtcNow, [" nvda ", "NVDA", "msft"], "Neutral", 0m, []));
 
         await publisher.PublishNewsCreatedAsync(message, CancellationToken.None);
 
-        Assert.Equal(["news:new"], client.MethodNames);
-        Assert.Equal(eventId, Assert.IsType<NewsCreatedEvent>(Assert.Single(client.Arguments)).EventId);
+        Assert.Equal(["all", "ticker:NVDA", "ticker:MSFT"], ((HubClientsProxy)(object)clients).Targets);
+        Assert.Equal(["news:new", "news:new", "news:new"], client.MethodNames);
+        Assert.All(client.Arguments, argument => Assert.Equal(eventId, Assert.IsType<NewsCreatedEvent>(argument).EventId));
     }
 #pragma warning restore CA1707
 
@@ -59,10 +60,24 @@ public sealed class SignalRRealtimePublisherTests
     {
         public IClientProxy Client { get; set; } = null!;
 
-        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args) =>
-            targetMethod?.Name == "get_All" || targetMethod?.ReturnType == typeof(IClientProxy)
-                ? Client
-                : throw new NotSupportedException(targetMethod?.Name);
+        public List<string> Targets { get; } = [];
+
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
+        {
+            if (targetMethod?.Name == "get_All")
+            {
+                Targets.Add("all");
+                return Client;
+            }
+
+            if (targetMethod?.Name == "Group")
+            {
+                Targets.Add((string)args![0]!);
+                return Client;
+            }
+
+            throw new NotSupportedException(targetMethod?.Name);
+        }
 #pragma warning restore CA1852
     }
 }

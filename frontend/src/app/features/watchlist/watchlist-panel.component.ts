@@ -6,7 +6,7 @@ import { finalize } from 'rxjs';
 import { WatchlistItem } from '../../core/models/watchlist-item';
 import { WatchlistApiService } from '../../core/services/watchlist-api.service';
 
-const validTicker = /^[A-Z0-9./-]{1,16}$/;
+const validTicker = /^[A-Z][A-Z0-9.-]{0,19}$/;
 
 @Component({
   selector: 'sp-watchlist-panel',
@@ -18,7 +18,7 @@ const validTicker = /^[A-Z0-9./-]{1,16}$/;
       <form class="watchlist__form" (ngSubmit)="addTicker()">
         <label for="watchlist-ticker">เพิ่มหุ้น</label>
         <div>
-          <input id="watchlist-ticker" name="ticker" [(ngModel)]="ticker" maxlength="16" autocomplete="off" placeholder="เช่น NVDA" />
+          <input id="watchlist-ticker" name="ticker" [(ngModel)]="ticker" maxlength="20" autocomplete="off" placeholder="เช่น NVDA" />
           <button type="submit" [disabled]="isSaving()">+</button>
         </div>
       </form>
@@ -64,7 +64,7 @@ export class WatchlistPanelComponent {
   addTicker(): void {
     const normalizedTicker = this.ticker.trim().toUpperCase();
     if (!validTicker.test(normalizedTicker)) {
-      this.errorMessage.set('Ticker ต้องมี A-Z, 0-9, จุด, / หรือ - และยาวไม่เกิน 16 ตัวอักษร');
+      this.errorMessage.set('Ticker ต้องขึ้นต้นด้วย A-Z และใช้ได้เฉพาะ A-Z, 0-9, จุด หรือ - ความยาวไม่เกิน 20 ตัวอักษร');
       return;
     }
 
