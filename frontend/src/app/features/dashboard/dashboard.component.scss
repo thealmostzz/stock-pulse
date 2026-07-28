@@ -111,3 +111,9 @@
     border-top: 1px solid var(--sp-border);
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard__watchlist > summary {
+    transition: none;
+  }
+}
