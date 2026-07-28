@@ -181,6 +181,28 @@ describe('DashboardComponent', () => {
     expect(component.items().map((item) => item.id)).toEqual([2]);
   });
 
+  it('keeps a possible count after a replacement request retains items and fails', async () => {
+    const responses: Subject<PagedNewsResponse>[] = [];
+    const component = createComponent(() => {
+      const response = new Subject<PagedNewsResponse>();
+      responses.push(response);
+      return response;
+    });
+    await component.ngOnInit();
+    responses[0].next(createResponse([
+      createNews(2, { tickers: ['AAPL'] }),
+      createNews(1, { tickers: ['AAPL'] }),
+    ], 1, 10));
+    responses[0].complete();
+
+    component.updateQuery({ ticker: 'AAPL' });
+    responses[1].error(new Error('Query failed'));
+
+    expect(component.items().map((item) => item.id)).toEqual([2, 1]);
+    expect(component.totalCount()).toBe(2);
+    expect(component.errorMessage()).toBe('ไม่สามารถโหลดข่าวได้');
+  });
+
   it('does not insert a buffered NVDA event while ticker AAPL is selected', fakeAsync(() => {
     const hubEvents = new Subject<NewsCreatedEvent>();
     const component = createComponent(() => new Subject<PagedNewsResponse>(), hubEvents);
@@ -274,6 +296,46 @@ describe('DashboardComponent', () => {
     expect(component.query().page).toBe(2);
     expect(requests.length).toBe(1);
   });
+
+  it('re-evaluates a watchlist event received before initial active tickers are published', fakeAsync(() => {
+    const requests: NewsQuery[] = [];
+    const hubEvents = new Subject<NewsCreatedEvent>();
+    const component = createComponent(
+      (query) => {
+        requests.push(query);
+        return new Subject<PagedNewsResponse>();
+      },
+      hubEvents,
+      Promise.resolve(),
+      { page: '2', watchlistOnly: 'true' },
+    );
+
+    void component.ngOnInit();
+    hubEvents.next(createEvent('event-aapl', createNews(501, { tickers: ['AAPL'] })));
+    tick(250);
+    expect(component.items()).toEqual([]);
+
+    component.setActiveWatchlistTickers(['AAPL']);
+
+    expect(component.items().map((item) => item.id)).toEqual([501]);
+    expect(component.query().page).toBe(2);
+    expect(requests.length).toBe(1);
+  }));
+
+  it('keeps total count at least as large as displayed items after matching realtime news', fakeAsync(() => {
+    const initialNews = new Subject<PagedNewsResponse>();
+    const hubEvents = new Subject<NewsCreatedEvent>();
+    const component = createComponent(() => initialNews, hubEvents);
+
+    void component.ngOnInit();
+    initialNews.next(createResponse([createNews(1)], 1, 1));
+    initialNews.complete();
+    hubEvents.next(createEvent('event-2', createNews(2)));
+    tick(250);
+
+    expect(component.items().map((item) => item.id)).toEqual([2, 1]);
+    expect(component.totalCount()).toBe(2);
+  }));
 
   it('orders impact realtime news by publication time and then ID for deterministic ties', fakeAsync(() => {
     const hubEvents = new Subject<NewsCreatedEvent>();

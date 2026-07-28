@@ -62,6 +62,17 @@ describe('NewsFeedComponent', () => {
     expect(loadingMore.getAttribute('aria-busy')).toBe('true');
   });
 
+  it('never announces a total smaller than the displayed item count', () => {
+    const fixture = createFixture(createItems(2));
+    fixture.componentRef.setInput('totalCount', 1);
+    fixture.detectChanges();
+
+    const count = fixture.nativeElement.querySelector('.news-feed__count') as HTMLElement;
+
+    expect(count.textContent).toContain('แสดง 2 จาก 2 ข่าว');
+    expect(count.textContent).not.toContain('แสดง 2 จาก 1 ข่าว');
+  });
+
   it('forwards filter changes and clear requests to the dashboard boundary', () => {
     const fixture = createFixture();
     const filter = fixture.debugElement.query(By.directive(NewsFilterComponent)).componentInstance as NewsFilterComponent;

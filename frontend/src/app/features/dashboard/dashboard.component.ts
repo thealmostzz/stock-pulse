@@ -40,6 +40,7 @@ export class DashboardComponent implements OnInit {
   private latestRequestId = 0;
   private activeReplacementRequestId: number | null = null;
   private pendingRealtimeItems: NewsItem[] = [];
+  private pendingWatchlistItems: NewsItem[] = [];
   private hasPublishedActiveWatchlistTickers = false;
 
   readonly items = signal<NewsItem[]>([]);
@@ -122,10 +123,17 @@ export class DashboardComponent implements OnInit {
     const previousTickers = this.activeWatchlistTickers();
     const tickersChanged = previousTickers.length !== normalizedTickers.length
       || normalizedTickers.some((ticker) => !previousTickers.includes(ticker));
+    const isInitialPublication = !this.hasPublishedActiveWatchlistTickers;
     const shouldReload = this.hasPublishedActiveWatchlistTickers && tickersChanged && this.query().watchlistOnly;
 
     this.activeWatchlistTickers.set(normalizedTickers);
     this.hasPublishedActiveWatchlistTickers = true;
+
+    if (isInitialPublication && this.pendingWatchlistItems.length > 0) {
+      const pendingWatchlistItems = this.pendingWatchlistItems;
+      this.pendingWatchlistItems = [];
+      this.mergeMatchingRealtimeItems(pendingWatchlistItems);
+    }
 
     if (shouldReload) {
       const nextQuery = { ...this.query(), page: 1 };
@@ -137,6 +145,7 @@ export class DashboardComponent implements OnInit {
 
   prependNews(news: NewsItem): void {
     this.items.update((current) => this.mergeNews([news], current));
+    this.reconcileTotalCount();
   }
 
   trackByNewsId(_: number, item: NewsItem): number {
@@ -158,11 +167,11 @@ export class DashboardComponent implements OnInit {
     } else {
       this.isLoading.set(true);
       this.isLoadingMore.set(false);
-      this.totalCount.set(0);
       this.hasMore.set(false);
       this.activeReplacementRequestId = requestId;
       this.pendingRealtimeItems = [];
       this.items.update((current) => current.filter((item) => this.matchesActiveQuery(item)));
+      this.totalCount.set(this.items().length);
     }
 
     this.newsApi.query(requestedQuery)
@@ -198,7 +207,7 @@ export class DashboardComponent implements OnInit {
       this.items.set(this.mergeNews(this.pendingRealtimeItems, response.items));
     }
 
-    this.totalCount.set(response.totalCount);
+    this.reconcileTotalCount(response.totalCount);
     this.hasMore.set(response.hasMore);
   }
 
@@ -220,18 +229,36 @@ export class DashboardComponent implements OnInit {
   private prependEvents(events: NewsCreatedEvent[]): void {
     const uniqueNews = events
       .filter((event) => this.rememberEventId(event.eventId))
-      .map((event) => event.news)
-      .filter((news) => this.matchesActiveQuery(news));
+      .map((event) => event.news);
 
     if (uniqueNews.length === 0) {
       return;
     }
 
-    if (this.activeReplacementRequestId === this.latestRequestId) {
-      this.pendingRealtimeItems = this.mergeNews(uniqueNews, this.pendingRealtimeItems);
+    if (this.query().watchlistOnly && !this.hasPublishedActiveWatchlistTickers) {
+      this.pendingWatchlistItems = this.mergeNews(uniqueNews, this.pendingWatchlistItems);
+      return;
     }
 
-    this.items.update((current) => this.mergeNews(uniqueNews, current));
+    this.mergeMatchingRealtimeItems(uniqueNews);
+  }
+
+  private mergeMatchingRealtimeItems(items: readonly NewsItem[]): void {
+    const matchingItems = items.filter((news) => this.matchesActiveQuery(news));
+    if (matchingItems.length === 0) {
+      return;
+    }
+
+    if (this.activeReplacementRequestId === this.latestRequestId) {
+      this.pendingRealtimeItems = this.mergeNews(matchingItems, this.pendingRealtimeItems);
+    }
+
+    this.items.update((current) => this.mergeNews(matchingItems, current));
+    this.reconcileTotalCount();
+  }
+
+  private reconcileTotalCount(reportedTotalCount = this.totalCount()): void {
+    this.totalCount.set(Math.max(reportedTotalCount, this.items().length));
   }
 
   private matchesActiveQuery(news: NewsItem): boolean {

@@ -27,7 +27,7 @@ import { NewsFilterComponent } from './news-filter.component';
           (clearRequested)="clearRequested.emit()"
         />
         <p class="news-feed__count" role="status" aria-live="polite" aria-atomic="true">
-          แสดง {{ items().length }} จาก {{ totalCount() }} ข่าว
+          แสดง {{ items().length }} จาก {{ announcedTotalCount() }} ข่าว
         </p>
       </header>
 
@@ -102,6 +102,7 @@ export class NewsFeedComponent {
   readonly clearRequested = output<void>();
   readonly loadMore = output<void>();
   readonly skeletonRows = [1, 2, 3, 4, 5, 6];
+  readonly announcedTotalCount = computed(() => Math.max(this.totalCount(), this.items().length));
   readonly connectionStatusLabel = computed(() => this.connectionStatus().label);
   readonly connectionStatusAriaLabel = computed(() => `Realtime feed ${this.connectionStatus().ariaLabel}`);
   readonly connectionStatusClass = computed(() => `news-feed__status news-feed__status--${this.connectionStatus().modifier}`);
