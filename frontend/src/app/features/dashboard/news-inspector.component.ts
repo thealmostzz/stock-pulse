@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 import { NewsItem } from '../../core/models/news-item';
 
+const newsDateTimeFormatter = new Intl.DateTimeFormat('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+
 @Component({
   selector: 'sp-news-inspector',
   standalone: true,
@@ -11,7 +13,7 @@ import { NewsItem } from '../../core/models/news-item';
         <p class="news-inspector__eyebrow">CONTEXT INSPECTOR</p>
         <div class="news-inspector__meta">
           <span>{{ selectedNews.sourceCode }}</span>
-          <time [attr.datetime]="selectedNews.publishedAtUtc">{{ publishedTime }}</time>
+          <time class="sp-mono" [attr.datetime]="selectedNews.publishedAtUtc">{{ publishedTime }}</time>
         </div>
         <h2>{{ selectedNews.title }}</h2>
         @if (selectedNews.summary) {
@@ -19,7 +21,7 @@ import { NewsItem } from '../../core/models/news-item';
         }
         <div class="news-inspector__tickers" aria-label="Related tickers">
           @for (ticker of selectedNews.tickers; track ticker) {
-            <span>{{ ticker }}</span>
+            <span class="sp-mono">{{ ticker }}</span>
           }
         </div>
         <dl class="news-inspector__signals" aria-label="News signals">
@@ -29,7 +31,7 @@ import { NewsItem } from '../../core/models/news-item';
           </div>
           <div>
             <dt>Impact</dt>
-            <dd>{{ selectedNews.impactScore }}</dd>
+            <dd class="news-inspector__impact-score sp-mono">{{ selectedNews.impactScore }}</dd>
           </div>
         </dl>
         <a [href]="selectedNews.url" target="_blank" rel="noopener noreferrer">เปิดบทความต้นฉบับ</a>
@@ -70,7 +72,7 @@ export class NewsInspectorComponent {
     const selectedNews = this.news();
 
     return selectedNews
-      ? new Intl.DateTimeFormat('th-TH', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(selectedNews.publishedAtUtc))
+      ? newsDateTimeFormatter.format(new Date(selectedNews.publishedAtUtc))
       : '';
   }
 }

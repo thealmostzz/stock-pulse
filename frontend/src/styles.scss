@@ -13,6 +13,11 @@ body {
   box-sizing: border-box;
 }
 
+.sp-mono {
+  font-family: var(--sp-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
 :focus-visible {
   outline: 2px solid var(--sp-focus-ring);
   outline-offset: 2px;

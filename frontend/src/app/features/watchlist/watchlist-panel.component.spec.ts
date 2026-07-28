@@ -47,6 +47,27 @@ describe('WatchlistPanelComponent', () => {
     expect(button.disabled).toBeTrue();
     expect(button.getAttribute('aria-label')).toContain('กำลังเพิ่มหุ้น');
   });
+
+  it('uses semantic mono typography for ticker values but not descriptions', () => {
+    const fixture = TestBed.createComponent(WatchlistPanelComponent);
+    fixture.detectChanges();
+    fixture.componentInstance.isLoading.set(false);
+    fixture.componentInstance.items.set([{
+      id: 1,
+      ticker: 'NVDA',
+      displayName: 'NVIDIA',
+      market: 'NASDAQ',
+      isActive: true,
+      sortOrder: 0,
+    }]);
+    fixture.detectChanges();
+
+    const ticker = fixture.nativeElement.querySelector('strong') as HTMLElement;
+    const description = fixture.nativeElement.querySelector('small') as HTMLElement;
+
+    expect(ticker.classList.contains('sp-mono')).toBeTrue();
+    expect(description.classList.contains('sp-mono')).toBeFalse();
+  });
 });
 
 function createComponent(): WatchlistPanelComponent {

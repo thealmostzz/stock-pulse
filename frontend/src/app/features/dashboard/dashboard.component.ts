@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, DestroyRef, Inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, ElementRef, HostListener, Inject, OnInit, signal, ViewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HubConnectionState } from '@microsoft/signalr';
 import { filter, finalize, bufferTime } from 'rxjs';
@@ -12,6 +12,7 @@ import { WatchlistPanelComponent } from '../watchlist/watchlist-panel.component'
 
 const maxNewsItems = 300;
 const initialNewsLimit = 30;
+const desktopLayoutMinWidth = 720;
 
 @Component({
   selector: 'sp-dashboard',
@@ -24,6 +25,8 @@ const initialNewsLimit = 30;
 export class DashboardComponent implements OnInit {
   private readonly receivedEventIds = new Set<string>();
   private readonly receivedEventIdOrder: string[] = [];
+
+  @ViewChild('watchlistDisclosure') private watchlistDisclosure?: ElementRef<HTMLDetailsElement>;
 
   readonly items = signal<NewsItem[]>([]);
   readonly selectedNews = signal<NewsItem | null>(null);
@@ -70,6 +73,15 @@ export class DashboardComponent implements OnInit {
 
   selectNews(news: NewsItem): void {
     this.selectedNews.set(news);
+  }
+
+  @HostListener('window:resize')
+  ensureWatchlistVisibleOnDesktop(): void {
+    const disclosure = this.watchlistDisclosure?.nativeElement;
+
+    if (window.innerWidth >= desktopLayoutMinWidth && disclosure && !disclosure.open) {
+      disclosure.open = true;
+    }
   }
 
   trackByNewsId(_: number, item: NewsItem): number {

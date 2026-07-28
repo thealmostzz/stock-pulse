@@ -36,7 +36,7 @@ const validTicker = /^[A-Z][A-Z0-9.-]{0,19}$/;
         <ul aria-live="polite">
           @for (item of items(); track item.id) {
             <li>
-              <span><strong>{{ item.ticker }}</strong><small>{{ item.displayName || item.market || 'ติดตามข่าวล่าสุด' }}</small></span>
+              <span><strong class="sp-mono">{{ item.ticker }}</strong><small>{{ item.displayName || item.market || 'ติดตามข่าวล่าสุด' }}</small></span>
               <button type="button" (click)="removeTicker(item)" [attr.aria-label]="'ลบ ' + item.ticker">×</button>
             </li>
           }

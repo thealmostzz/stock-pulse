@@ -1,6 +1,7 @@
 import { DestroyRef } from '@angular/core';
 import { fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { HubConnectionState } from '@microsoft/signalr';
+import { By } from '@angular/platform-browser';
 import { of, Subject } from 'rxjs';
 
 import { NewsCreatedEvent, NewsItem } from '../../core/models/news-item';
@@ -8,6 +9,8 @@ import { NewsApiService } from '../../core/services/news-api.service';
 import { NewsHubService } from '../../core/services/news-hub.service';
 import { WatchlistApiService } from '../../core/services/watchlist-api.service';
 import { DashboardComponent } from './dashboard.component';
+import { NewsFeedComponent } from './news-feed.component';
+import { NewsInspectorComponent } from './news-inspector.component';
 
 describe('DashboardComponent', () => {
   beforeEach(() => {
@@ -37,6 +40,22 @@ describe('DashboardComponent', () => {
 
     expect(summary.textContent?.trim()).toContain('Watchlist');
     expect(feed).not.toBeNull();
+  });
+
+  it('reopens a collapsed mobile watchlist after resizing to the desktop layout', () => {
+    const fixture = TestBed.createComponent(DashboardComponent);
+    fixture.detectChanges();
+    const disclosure = fixture.nativeElement.querySelector('.dashboard__watchlist') as HTMLDetailsElement;
+    disclosure.open = false;
+    const innerWidth = spyOnProperty(window, 'innerWidth', 'get').and.returnValue(719);
+
+    window.dispatchEvent(new Event('resize'));
+    expect(disclosure.open).toBeFalse();
+
+    innerWidth.and.returnValue(720);
+    window.dispatchEvent(new Event('resize'));
+
+    expect(disclosure.open).toBeTrue();
   });
 
   it('loads the initial feed with the API default limit while retaining the larger in-memory cap', async () => {
@@ -78,6 +97,22 @@ describe('DashboardComponent', () => {
     component.selectNews(news);
 
     expect(component.selectedNews()).toBe(news);
+  });
+
+  it('propagates feed selection to the selected feed state and inspector', () => {
+    const fixture = TestBed.createComponent(DashboardComponent);
+    const news = createNews(100);
+    fixture.componentInstance.items.set([news]);
+    fixture.detectChanges();
+    const feed = fixture.debugElement.query(By.directive(NewsFeedComponent)).componentInstance as NewsFeedComponent;
+
+    feed.newsSelected.emit(news);
+    fixture.detectChanges();
+
+    const inspector = fixture.debugElement.query(By.directive(NewsInspectorComponent)).componentInstance as NewsInspectorComponent;
+    expect(fixture.componentInstance.selectedNews()).toBe(news);
+    expect(feed.selectedNewsId()).toBe(news.id);
+    expect(inspector.news()).toBe(news);
   });
 
   it('keeps hub news that arrives before the initial HTTP response', fakeAsync(() => {

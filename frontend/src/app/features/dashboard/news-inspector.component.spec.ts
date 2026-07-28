@@ -24,6 +24,24 @@ describe('NewsInspectorComponent', () => {
     expect(externalLink.rel).toContain('noopener');
     expect(externalLink.rel).toContain('noreferrer');
   });
+
+  it('uses semantic mono typography for time, ticker, and impact score but not prose', () => {
+    const fixture = TestBed.createComponent(NewsInspectorComponent);
+    fixture.componentRef.setInput('news', createNews());
+    fixture.detectChanges();
+
+    const time = fixture.nativeElement.querySelector('time') as HTMLElement;
+    const ticker = fixture.nativeElement.querySelector('.news-inspector__tickers span') as HTMLElement;
+    const impactScore = fixture.nativeElement.querySelector('.news-inspector__impact-score') as HTMLElement | null;
+    const title = fixture.nativeElement.querySelector('h2') as HTMLElement;
+    const summary = fixture.nativeElement.querySelector('.news-inspector__summary') as HTMLElement;
+
+    expect(time.classList.contains('sp-mono')).toBeTrue();
+    expect(ticker.classList.contains('sp-mono')).toBeTrue();
+    expect(impactScore?.classList.contains('sp-mono')).toBeTrue();
+    expect(title.classList.contains('sp-mono')).toBeFalse();
+    expect(summary.classList.contains('sp-mono')).toBeFalse();
+  });
 });
 
 function createNews(): NewsItem {
