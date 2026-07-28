@@ -18,11 +18,11 @@ public sealed class FinnhubNewsClient : IProviderNewsClient
             LogLevel.Warning,
             new EventId(1, "FinnhubRequestFailure"),
             "Finnhub company news request failed with status code {StatusCode} for ticker {Ticker}.");
-    private static readonly Action<ILogger, string, Exception?> LogProcessingFailure =
-        LoggerMessage.Define<string>(
+    private static readonly Action<ILogger, string, string, Exception?> LogProcessingFailure =
+        LoggerMessage.Define<string, string>(
             LogLevel.Warning,
             new EventId(2, "FinnhubProcessingFailure"),
-            "Finnhub company news request could not be processed for ticker {Ticker}.");
+            "Finnhub company news request failed with error kind {ErrorKind} for ticker {Ticker}.");
 
     private readonly StockPulseDbContext dbContext;
     private readonly IHttpClientFactory httpClientFactory;
@@ -102,9 +102,9 @@ public sealed class FinnhubNewsClient : IProviderNewsClient
             {
                 throw;
             }
-            catch (Exception exception) when (exception is HttpRequestException or JsonException)
+            catch (Exception exception) when (IsProviderProcessingFailure(exception))
             {
-                LogProcessingFailure(logger, ticker, exception);
+                LogProcessingFailure(logger, GetErrorKind(exception), ticker, null);
             }
 
             if (index < tickers.Count - 1)
@@ -115,6 +115,18 @@ public sealed class FinnhubNewsClient : IProviderNewsClient
 
         return articles;
     }
+
+    private static bool IsProviderProcessingFailure(Exception exception) =>
+        exception is OperationCanceledException or IOException or HttpRequestException or JsonException;
+
+    private static string GetErrorKind(Exception exception) => exception switch
+    {
+        OperationCanceledException => "timeout",
+        IOException => "io",
+        HttpRequestException => "transport",
+        JsonException => "json",
+        _ => "unknown"
+    };
 
     private string CreateCompanyNewsRequestUri(string ticker, DateTime fromDate, DateTime toDate)
     {

@@ -143,6 +143,72 @@ public sealed class FinnhubNewsClientTests
     }
 
     [Fact]
+    public async Task FetchNewsAsync_WhenFirstRequestTimesOut_LogsTimeoutAndFetchesSecondTicker()
+    {
+        var schemaName = await CreateSchemaAsync();
+
+        try
+        {
+            await using var dbContext = await CreateSchemaDbContextAsync(schemaName);
+            dbContext.WatchlistItems.AddRange(
+                CreateWatchlistItem("AAPL", 1, true),
+                CreateWatchlistItem("MSFT", 2, true));
+            await dbContext.SaveChangesAsync();
+            using var testClient = CreateClient(
+                dbContext,
+                (requestNumber, _, _) => requestNumber == 1
+                    ? Task.FromException<HttpResponseMessage>(new OperationCanceledException("provider timeout"))
+                    : Task.FromResult(CreateJsonResponse("[{\"datetime\":1760515200,\"headline\":\"Microsoft update\",\"id\":7,\"summary\":\"Summary\",\"url\":\"https://news.example/msft\"}]")));
+
+            var news = await testClient.Client.FetchNewsAsync(CancellationToken.None);
+
+            var article = Assert.Single(news);
+            Assert.Equal("MSFT", Assert.Single(article.Tickers));
+            var timeoutLog = Assert.Single(testClient.Logger.Entries);
+            Assert.Contains("timeout", timeoutLog.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Null(timeoutLog.Exception);
+        }
+        finally
+        {
+            await DropSchemaAsync(schemaName);
+        }
+    }
+
+    [Fact]
+    public async Task FetchNewsAsync_WhenTransportExceptionContainsRequestData_LogsSanitizedErrorAndFetchesSecondTicker()
+    {
+        var schemaName = await CreateSchemaAsync();
+
+        try
+        {
+            await using var dbContext = await CreateSchemaDbContextAsync(schemaName);
+            dbContext.WatchlistItems.AddRange(
+                CreateWatchlistItem("AAPL", 1, true),
+                CreateWatchlistItem("MSFT", 2, true));
+            await dbContext.SaveChangesAsync();
+            using var testClient = CreateClient(
+                dbContext,
+                (requestNumber, _, _) => requestNumber == 1
+                    ? Task.FromException<HttpResponseMessage>(new HttpRequestException("GET https://finnhub.io/api/v1/company-news?token=secret-finnhub-token"))
+                    : Task.FromResult(CreateJsonResponse("[{\"datetime\":1760515200,\"headline\":\"Microsoft update\",\"id\":7,\"summary\":\"Summary\",\"url\":\"https://news.example/msft\"}]")));
+
+            var news = await testClient.Client.FetchNewsAsync(CancellationToken.None);
+
+            var article = Assert.Single(news);
+            Assert.Equal("MSFT", Assert.Single(article.Tickers));
+            var transportLog = Assert.Single(testClient.Logger.Entries);
+            Assert.Contains("transport", transportLog.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("company-news", transportLog.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("secret-finnhub-token", transportLog.Message, StringComparison.Ordinal);
+            Assert.Null(transportLog.Exception);
+        }
+        finally
+        {
+            await DropSchemaAsync(schemaName);
+        }
+    }
+
+    [Fact]
     public async Task FetchNewsAsync_UsesLatestPersistedUtcDateOrSevenDaysBeforeToday()
     {
         var schemaName = await CreateSchemaAsync();
@@ -203,9 +269,16 @@ public sealed class FinnhubNewsClientTests
     private static TestClient CreateClient(StockPulseDbContext dbContext, params HttpResponseMessage[] responses) =>
         CreateClient(dbContext, (IEnumerable<HttpResponseMessage>)responses);
 
+    private static TestClient CreateClient(
+        StockPulseDbContext dbContext,
+        Func<int, HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> responseFactory) =>
+        CreateClient(dbContext, new RecordingHttpMessageHandler(responseFactory));
+
     private static TestClient CreateClient(StockPulseDbContext dbContext, IEnumerable<HttpResponseMessage>? responses = null)
+        => CreateClient(dbContext, new RecordingHttpMessageHandler(responses ?? []));
+
+    private static TestClient CreateClient(StockPulseDbContext dbContext, RecordingHttpMessageHandler handler)
     {
-        var handler = new RecordingHttpMessageHandler(responses ?? []);
         var logger = new RecordingLogger<FinnhubNewsClient>();
         var timeProvider = new ImmediateTimeProvider(new DateTimeOffset(2026, 7, 29, 10, 0, 0, TimeSpan.Zero));
         var services = new ServiceCollection();
@@ -334,9 +407,20 @@ public sealed class FinnhubNewsClientTests
         public HttpClient CreateClient(string name) => new(handler) { BaseAddress = new Uri("https://finnhub.io/api/v1/") };
     }
 
-    private sealed class RecordingHttpMessageHandler(IEnumerable<HttpResponseMessage> responses) : HttpMessageHandler
+    private sealed class RecordingHttpMessageHandler : HttpMessageHandler
     {
-        private readonly Queue<HttpResponseMessage> responses = new(responses);
+        private readonly Queue<HttpResponseMessage>? responses;
+        private readonly Func<int, HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>? responseFactory;
+
+        public RecordingHttpMessageHandler(IEnumerable<HttpResponseMessage> responses)
+        {
+            this.responses = new Queue<HttpResponseMessage>(responses);
+        }
+
+        public RecordingHttpMessageHandler(Func<int, HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> responseFactory)
+        {
+            this.responseFactory = responseFactory;
+        }
 
         public List<Uri> RequestUris { get; } = [];
 
@@ -347,12 +431,15 @@ public sealed class FinnhubNewsClientTests
                 RequestUris.Add(request.RequestUri);
             }
 
-            return Task.FromResult(responses.Count > 0 ? responses.Dequeue() : CreateJsonResponse("[]"));
+            return responseFactory is not null
+                ? responseFactory(RequestUris.Count, request, cancellationToken)
+                : Task.FromResult(responses is { Count: > 0 } ? responses.Dequeue() : CreateJsonResponse("[]"));
         }
     }
 
     private sealed class RecordingLogger<T> : ILogger<T>
     {
+        public List<LogEntry> Entries { get; } = [];
         public List<string> Messages { get; } = [];
 
         public IDisposable? BeginScope<TState>(TState state)
@@ -362,9 +449,13 @@ public sealed class FinnhubNewsClientTests
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
-            Messages.Add(formatter(state, exception));
+            var message = formatter(state, exception);
+            Entries.Add(new LogEntry(message, exception));
+            Messages.Add(message);
         }
     }
+
+    private sealed record LogEntry(string Message, Exception? Exception);
 
     private sealed class ImmediateTimeProvider(DateTimeOffset utcNow) : TimeProvider
     {
