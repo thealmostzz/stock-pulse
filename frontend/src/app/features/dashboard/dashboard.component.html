@@ -1,10 +1,22 @@
 <main class="dashboard" aria-label="Stock Pulse operating dashboard">
   <aside class="dashboard__sidebar" aria-label="Watchlist">
-    <sp-watchlist-panel />
+    <sp-watchlist-panel (activeTickersChanged)="setActiveWatchlistTickers($event)" />
   </aside>
 
   <section class="dashboard__feed" aria-label="Realtime news feed">
-    <sp-news-feed [items]="items()" [isLoading]="isLoading()" [connectionState]="connectionState()" />
+    <sp-news-feed
+      [items]="items()"
+      [query]="query()"
+      [isLoading]="isLoading()"
+      [connectionState]="connectionState()"
+      [totalCount]="totalCount()"
+      [hasMore]="hasMore()"
+      [isLoadingMore]="isLoadingMore()"
+      [errorMessage]="errorMessage()"
+      (queryChanged)="updateQuery($event)"
+      (clearRequested)="clearQuery()"
+      (loadMore)="loadNextPage()"
+    />
   </section>
 
   <aside class="dashboard__detail" aria-label="News inspector">
