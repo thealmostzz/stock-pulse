@@ -59,6 +59,27 @@ describe('NewsApiService', () => {
     httpTesting.verify();
   });
 
+  it('serializes the default publishedAt sort value exactly', () => {
+    const service = TestBed.inject(NewsApiService);
+    const httpTesting = TestBed.inject(HttpTestingController);
+
+    service.query({
+      ticker: null,
+      sourceCode: null,
+      sentiment: null,
+      tag: null,
+      page: 1,
+      pageSize: 30,
+      sortBy: 'publishedAt',
+      watchlistOnly: false,
+    }).subscribe();
+
+    const request = httpTesting.expectOne((candidate) => candidate.url === newsEndpoint);
+    expect(request.request.params.get('sortBy')).toBe('publishedAt');
+    request.flush({ items: [], page: 1, pageSize: 30, totalCount: 0, hasMore: false });
+    httpTesting.verify();
+  });
+
   it('maps a validation response to ApiValidationError', (done: DoneFn) => {
     const service = TestBed.inject(NewsApiService);
     const httpTesting = TestBed.inject(HttpTestingController);

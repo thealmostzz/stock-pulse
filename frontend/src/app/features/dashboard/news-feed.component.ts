@@ -43,7 +43,13 @@ import { NewsFilterComponent } from './news-filter.component';
             }
           </div>
         } @else if (items().length === 0) {
-          <p class="news-feed__empty" role="status">เพิ่มหุ้นใน Watchlist เพื่อเริ่มติดตามข่าว</p>
+          <p class="news-feed__empty" role="status">
+            @if (hasActiveFilters()) {
+              ไม่พบข่าวที่ตรงกับตัวกรองที่เลือก
+            } @else {
+              เพิ่มหุ้นใน Watchlist เพื่อเริ่มติดตามข่าว
+            }
+          </p>
         } @else {
           <cdk-virtual-scroll-viewport
             class="news-feed__viewport"
@@ -103,6 +109,16 @@ export class NewsFeedComponent {
   readonly loadMore = output<void>();
   readonly skeletonRows = [1, 2, 3, 4, 5, 6];
   readonly announcedTotalCount = computed(() => Math.max(this.totalCount(), this.items().length));
+  readonly hasActiveFilters = computed(() => {
+    const currentQuery = this.query();
+    return Boolean(
+      currentQuery.ticker
+      || currentQuery.sourceCode
+      || currentQuery.sentiment
+      || currentQuery.tag
+      || currentQuery.watchlistOnly,
+    );
+  });
   readonly connectionStatusLabel = computed(() => this.connectionStatus().label);
   readonly connectionStatusAriaLabel = computed(() => `Realtime feed ${this.connectionStatus().ariaLabel}`);
   readonly connectionStatusClass = computed(() => `news-feed__status news-feed__status--${this.connectionStatus().modifier}`);

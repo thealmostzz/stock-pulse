@@ -73,6 +73,26 @@ describe('NewsFeedComponent', () => {
     expect(count.textContent).not.toContain('แสดง 2 จาก 1 ข่าว');
   });
 
+  it('keeps the watchlist empty-state message when no filters are active', () => {
+    const fixture = createFixture();
+
+    const emptyState = fixture.nativeElement.querySelector('.news-feed__empty') as HTMLElement;
+
+    expect(emptyState.textContent?.trim()).toBe('เพิ่มหุ้นใน Watchlist เพื่อเริ่มติดตามข่าว');
+    expect(emptyState.getAttribute('role')).toBe('status');
+  });
+
+  it('shows a no-matching-news message when active filters return no items', () => {
+    const fixture = createFixture();
+    fixture.componentRef.setInput('query', createQuery({ ticker: 'AAPL' }));
+    fixture.detectChanges();
+
+    const emptyState = fixture.nativeElement.querySelector('.news-feed__empty') as HTMLElement;
+
+    expect(emptyState.textContent?.trim()).toBe('ไม่พบข่าวที่ตรงกับตัวกรองที่เลือก');
+    expect(emptyState.getAttribute('role')).toBe('status');
+  });
+
   it('forwards filter changes and clear requests to the dashboard boundary', () => {
     const fixture = createFixture();
     const filter = fixture.debugElement.query(By.directive(NewsFilterComponent)).componentInstance as NewsFilterComponent;
@@ -112,7 +132,7 @@ function createItems(count: number): NewsItem[] {
   }));
 }
 
-function createQuery(): NewsQuery {
+function createQuery(changes: Partial<NewsQuery> = {}): NewsQuery {
   return {
     ticker: null,
     sourceCode: null,
@@ -122,5 +142,6 @@ function createQuery(): NewsQuery {
     pageSize: 30,
     sortBy: 'publishedAt',
     watchlistOnly: false,
+    ...changes,
   };
 }

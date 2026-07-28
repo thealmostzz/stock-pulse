@@ -46,11 +46,12 @@ public sealed class NewsQueryService(INewsRepository repository)
 
         var sortBy = string.IsNullOrWhiteSpace(request.SortBy)
             ? "publishedAt"
-            : request.SortBy.Trim().ToLowerInvariant();
-        if (sortBy is not ("publishedAt" or "impact"))
-        {
-            throw new ArgumentException("SortBy is invalid.", nameof(request));
-        }
+            : request.SortBy.Trim().ToLowerInvariant() switch
+            {
+                "publishedat" => "publishedAt",
+                "impact" => "impact",
+                _ => throw new ArgumentException("SortBy is invalid.", nameof(request)),
+            };
 
         var normalizedRequest = request with
         {

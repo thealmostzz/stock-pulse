@@ -49,6 +49,17 @@ public sealed class NewsQueryServiceTests
     }
 
     [Fact]
+    public async Task QueryAsync_NormalizesPublishedAtSortByToCanonicalValue()
+    {
+        var repository = new CapturingNewsRepository();
+        var service = new NewsQueryService(repository);
+
+        await service.QueryAsync(new NewsQueryRequest(null, null, null, null, SortBy: "publishedAt"), CancellationToken.None);
+
+        Assert.Equal("publishedAt", repository.LastRequest!.SortBy);
+    }
+
+    [Fact]
     public async Task QueryAsync_NormalizesSortByToImpact()
     {
         var repository = new CapturingNewsRepository();
