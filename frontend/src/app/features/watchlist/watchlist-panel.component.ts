@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize } from 'rxjs';
@@ -52,11 +52,16 @@ export class WatchlistPanelComponent {
   readonly isLoading = signal(true);
   readonly isSaving = signal(false);
   readonly errorMessage = signal('');
+  readonly activeTickersChanged = output<readonly string[]>();
   ticker = '';
 
   ngOnInit(): void {
     this.watchlistApi.getAll().pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.isLoading.set(false))).subscribe({
-      next: (items) => this.items.set(items.filter((item) => item.isActive)),
+      next: (items) => {
+        const activeItems = items.filter((item) => item.isActive);
+        this.items.set(activeItems);
+        this.publishActiveTickers(activeItems);
+      },
       error: () => this.errorMessage.set('ไม่สามารถโหลด Watchlist ได้'),
     });
   }
@@ -74,7 +79,9 @@ export class WatchlistPanelComponent {
       .pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.isSaving.set(false)))
       .subscribe({
         next: (item) => {
-          this.items.update((items) => [...items.filter((current) => current.ticker !== item.ticker), item]);
+          const items = [...this.items().filter((current) => current.ticker !== item.ticker), item];
+          this.items.set(items);
+          this.publishActiveTickers(items);
           this.ticker = '';
         },
         error: () => this.errorMessage.set('ไม่สามารถเพิ่มหุ้นใน Watchlist ได้'),
@@ -83,8 +90,16 @@ export class WatchlistPanelComponent {
 
   removeTicker(item: WatchlistItem): void {
     this.watchlistApi.remove(item.ticker).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: () => this.items.update((items) => items.filter((current) => current.id !== item.id)),
+      next: () => {
+        const items = this.items().filter((current) => current.id !== item.id);
+        this.items.set(items);
+        this.publishActiveTickers(items);
+      },
       error: () => this.errorMessage.set('ไม่สามารถลบหุ้นจาก Watchlist ได้'),
     });
+  }
+
+  private publishActiveTickers(items: readonly WatchlistItem[]): void {
+    this.activeTickersChanged.emit(items.filter((item) => item.isActive).map((item) => item.ticker));
   }
 }
