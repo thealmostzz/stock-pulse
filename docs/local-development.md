@@ -40,7 +40,7 @@ dotnet run --project backend/src/StockPulse.Worker
 npm.cmd start --prefix frontend
 ```
 
-Open http://localhost:4200. Add `AAPL` or `NVDA` in Watchlist; the mock provider inserts news every 15 seconds. The API accepts browser requests only from `http://localhost:4200` through its local CORS policy.
+Open http://localhost:4200 and add `AAPL` or `NVDA` in Watchlist. The Worker polls the mock fixture every 15 seconds, but the fixture is inserted only during its first ingestion into an empty database: later polls are deduplicated and do not create additional news or `news:new` events. The API accepts browser requests only from `http://localhost:4200` through its local CORS policy.
 
 ## Automated verification
 
@@ -57,12 +57,13 @@ All four commands must exit with code 0.
 
 ## Manual end-to-end checklist
 
-1. Start PostgreSQL, API, Worker, and Angular as above.
-2. Add `AAPL` through the UI and confirm `GET http://localhost:5000/api/watchlist` contains uppercase `AAPL`.
-3. Wait at least 15 seconds and confirm `GET http://localhost:5000/api/news/latest?limit=30` contains a mock article exactly once after several worker cycles.
-4. Open two browser tabs and confirm both receive the new-news highlight without a refresh.
-5. Request `GET http://localhost:5000/api/news?pageSize=201` and confirm the response is `400 Bad Request` rather than an unbounded query.
-6. Stop Worker and confirm the API and the existing dashboard remain usable.
+1. For a reproducible realtime event, start with an empty disposable local database: stop the API and Worker, run `docker compose -f docker/docker-compose.yml down -v`, start Compose again, and reapply the migration. This deletes only the local Compose volume.
+2. Start PostgreSQL, API, and Angular, but leave Worker stopped. Open two dashboard tabs so both SignalR clients connect before any fixture is ingested.
+3. Add `AAPL` through the UI and confirm `GET http://localhost:5000/api/watchlist` contains uppercase `AAPL`.
+4. Start Worker. Its first cycle persists the mock fixture; its following cycle dispatches the pending realtime outbox. Wait up to 30 seconds and confirm `GET http://localhost:5000/api/news/latest?limit=30` contains each fixture article exactly once after several worker cycles.
+5. Confirm both already-open dashboard tabs receive the new-news highlight without a refresh. Repeated Worker polls do not create further highlights because the fixture is deduplicated.
+6. Request `GET http://localhost:5000/api/news?pageSize=201` and confirm the response is `400 Bad Request` rather than an unbounded query.
+7. Stop Worker and confirm the API and the existing dashboard remain usable.
 
 ## Quality review checklist
 
