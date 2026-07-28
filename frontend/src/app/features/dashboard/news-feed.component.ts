@@ -59,10 +59,12 @@ import { NewsFilterComponent } from './news-filter.component';
             (scrolledIndexChange)="onScrolledIndexChange($event)"
           >
             <sp-news-card
-              *cdkVirtualFor="let item of items(); let index = index; trackBy: trackByNewsId"
-              [item]="item"
-              [isNewest]="index === 0"
-            />
+            *cdkVirtualFor="let item of items(); let index = index; trackBy: trackByNewsId"
+            [item]="item"
+            [isNewest]="index === 0"
+            [isSelected]="item.id === selectedNewsId()"
+            (newsSelected)="newsSelected.emit($event)"
+          />
           </cdk-virtual-scroll-viewport>
         }
       </div>
@@ -97,6 +99,7 @@ import { NewsFilterComponent } from './news-filter.component';
 })
 export class NewsFeedComponent {
   readonly items = input.required<NewsItem[]>();
+  readonly selectedNewsId = input<number | null>(null);
   readonly query = input.required<NewsQuery>();
   readonly isLoading = input(false);
   readonly connectionState = input(HubConnectionState.Disconnected);
@@ -107,6 +110,7 @@ export class NewsFeedComponent {
   readonly queryChanged = output<Partial<NewsQuery>>();
   readonly clearRequested = output<void>();
   readonly loadMore = output<void>();
+  readonly newsSelected = output<NewsItem>();
   readonly skeletonRows = [1, 2, 3, 4, 5, 6];
   readonly announcedTotalCount = computed(() => Math.max(this.totalCount(), this.items().length));
   readonly hasActiveFilters = computed(() => {

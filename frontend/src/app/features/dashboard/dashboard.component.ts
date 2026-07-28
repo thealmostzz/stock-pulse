@@ -9,6 +9,7 @@ import { NewsQuery, NewsSentimentFilter, NewsSortBy, PagedNewsResponse } from '.
 import { NewsApiService } from '../../core/services/news-api.service';
 import { NewsHubService } from '../../core/services/news-hub.service';
 import { NewsFeedComponent } from './news-feed.component';
+import { NewsInspectorComponent } from './news-inspector.component';
 import { WatchlistPanelComponent } from '../watchlist/watchlist-panel.component';
 
 const maxNewsItems = 300;
@@ -29,7 +30,7 @@ const defaultNewsQuery: NewsQuery = {
 @Component({
   selector: 'sp-dashboard',
   standalone: true,
-  imports: [NewsFeedComponent, WatchlistPanelComponent],
+  imports: [NewsFeedComponent, NewsInspectorComponent, WatchlistPanelComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -44,6 +45,7 @@ export class DashboardComponent implements OnInit {
   private hasPublishedActiveWatchlistTickers = false;
 
   readonly items = signal<NewsItem[]>([]);
+  readonly selectedNews = signal<NewsItem | null>(null);
   readonly isLoading = signal(true);
   readonly query = signal<NewsQuery>({ ...defaultNewsQuery });
   readonly totalCount = signal(0);
@@ -146,6 +148,10 @@ export class DashboardComponent implements OnInit {
   prependNews(news: NewsItem): void {
     this.items.update((current) => this.mergeNews([news], current));
     this.reconcileTotalCount();
+  }
+
+  selectNews(news: NewsItem): void {
+    this.selectedNews.set(news);
   }
 
   trackByNewsId(_: number, item: NewsItem): number {

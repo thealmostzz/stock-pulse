@@ -30,7 +30,7 @@ $env:STOCKPULSE_TEST_CONNECTION = 'Host=localhost;Port=5432;Database=stockpulse_
 dotnet ef database update --project backend/src/StockPulse.Infrastructure --startup-project backend/src/StockPulse.Infrastructure
 ```
 
-## Start applications
+## Start applications (default mock mode)
 
 Open three terminals at the repository root. Before starting the API and Worker, set the same non-placeholder realtime shared key in each terminal as described above.
 
@@ -41,6 +41,20 @@ npm.cmd start --prefix frontend
 ```
 
 Open http://localhost:4200 and add `AAPL` or `NVDA` in Watchlist. The Worker polls the mock fixture every 15 seconds, but the fixture is inserted only during its first ingestion into an empty database: later polls are deduplicated and do not create additional news or `news:new` events. The API accepts browser requests only from `http://localhost:4200` through its local CORS policy.
+
+The Worker uses mock providers by default (`Worker:UseMockProviders=true`), so the workflow above is reproducible without a provider account or API key. Keep this mode for the manual end-to-end checklist below.
+
+## Start Worker with Finnhub
+
+To use the real Finnhub provider, obtain your own free API key from Finnhub. Never paste that key into the repository, `appsettings` files, source code, the frontend, or logs. Store it only in local .NET User Secrets, then select Finnhub for the current PowerShell session:
+
+```powershell
+dotnet user-secrets set "Finnhub:ApiKey" "<your-key>" --project backend/src/StockPulse.Worker
+$env:Worker__UseMockProviders = 'false'
+dotnet run --project backend/src/StockPulse.Worker
+```
+
+In Finnhub mode, the Worker reads active Watchlist tickers only, in configured order. It processes at most 20 tickers per cycle, runs every 15 minutes, and waits one second between provider requests.
 
 ## Automated verification
 
@@ -64,6 +78,10 @@ All four commands must exit with code 0.
 5. Confirm both already-open dashboard tabs receive the new-news highlight without a refresh. Repeated Worker polls do not create further highlights because the fixture is deduplicated.
 6. Request `GET http://localhost:5000/api/news?pageSize=201` and confirm the response is `400 Bad Request` rather than an unbounded query.
 7. Stop Worker and confirm the API and the existing dashboard remain usable.
+
+## Finnhub smoke test
+
+This smoke test cannot run until you have configured your own valid Finnhub key in local User Secrets. Add a US ticker such as `AAPL`, start the API and dashboard, then start the Worker in Finnhub mode with the commands above. Wait for the first 15-minute cycle, then call `GET http://localhost:5000/api/news/latest?limit=30`. Confirm that an item has `sourceCode` `finnhub` and that its link opens in a browser.
 
 ## Quality review checklist
 

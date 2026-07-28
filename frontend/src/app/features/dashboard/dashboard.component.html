@@ -1,7 +1,10 @@
 <main class="dashboard" aria-label="Stock Pulse operating dashboard">
-  <aside class="dashboard__sidebar" aria-label="Watchlist">
-    <sp-watchlist-panel (activeTickersChanged)="setActiveWatchlistTickers($event)" />
-  </aside>
+  <details class="dashboard__watchlist" open>
+    <summary>Watchlist</summary>
+    <div class="dashboard__sidebar" aria-label="Watchlist">
+      <sp-watchlist-panel (activeTickersChanged)="setActiveWatchlistTickers($event)" />
+    </div>
+  </details>
 
   <section class="dashboard__feed" aria-label="Realtime news feed">
     <sp-news-feed
@@ -13,15 +16,13 @@
       [hasMore]="hasMore()"
       [isLoadingMore]="isLoadingMore()"
       [errorMessage]="errorMessage()"
+      [selectedNewsId]="selectedNews()?.id ?? null"
       (queryChanged)="updateQuery($event)"
       (clearRequested)="clearQuery()"
       (loadMore)="loadNextPage()"
+      (newsSelected)="selectNews($event)"
     />
   </section>
 
-  <aside class="dashboard__detail" aria-label="News inspector">
-    <p class="dashboard__eyebrow">CONTEXT INSPECTOR</p>
-    <h2>เลือกข่าวเพื่อดูรายละเอียด</h2>
-    <p>เปิดบทความจากรายการข่าวเพื่อดูแหล่งข้อมูลและผลกระทบต่อหุ้นที่เกี่ยวข้อง</p>
-  </aside>
+  <sp-news-inspector class="dashboard__detail" [news]="selectedNews()" />
 </main>
