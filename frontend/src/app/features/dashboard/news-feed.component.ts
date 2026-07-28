@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { ScrollingModule } from '@angular/cdk/scrolling';
 import { HubConnectionState } from '@microsoft/signalr';
 
@@ -15,6 +15,7 @@ import { NewsCardComponent } from './news-card.component';
         <div>
           <p class="news-feed__eyebrow">LIVE INTELLIGENCE</p>
           <h1 id="news-feed-title">Market news</h1>
+          <p class="news-feed__count">{{ items().length }} articles</p>
         </div>
         <span [class]="connectionStatusClass()" [attr.aria-label]="connectionStatusAriaLabel()">{{ connectionStatusLabel() }}</span>
       </header>
@@ -33,6 +34,8 @@ import { NewsCardComponent } from './news-card.component';
             *cdkVirtualFor="let item of items(); let index = index; trackBy: trackByNewsId"
             [item]="item"
             [isNewest]="index === 0"
+            [isSelected]="item.id === selectedNewsId()"
+            (newsSelected)="newsSelected.emit($event)"
           />
         </cdk-virtual-scroll-viewport>
       }
@@ -43,6 +46,7 @@ import { NewsCardComponent } from './news-card.component';
     .news-feed__header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.4rem 1.5rem 1.1rem; border-bottom: 1px solid var(--sp-border); }
     .news-feed__eyebrow { margin: 0 0 .3rem; color: var(--sp-muted); font-size: .65rem; font-weight: 700; letter-spacing: .13em; }
     h1 { margin: 0; font-size: 1.1rem; letter-spacing: -.03em; }
+    .news-feed__count { margin: .25rem 0 0; color: var(--sp-muted); font-size: .7rem; }
     .news-feed__status { color: var(--sp-muted); font-size: .68rem; font-weight: 700; letter-spacing: .1em; }
     .news-feed__status--connected { color: var(--sp-positive); }
     .news-feed__status--connecting, .news-feed__status--reconnecting { color: var(--sp-warning); }
@@ -58,8 +62,10 @@ import { NewsCardComponent } from './news-card.component';
 })
 export class NewsFeedComponent {
   readonly items = input.required<NewsItem[]>();
+  readonly selectedNewsId = input<number | null>(null);
   readonly isLoading = input(false);
   readonly connectionState = input(HubConnectionState.Disconnected);
+  readonly newsSelected = output<NewsItem>();
   readonly skeletonRows = [1, 2, 3, 4, 5, 6];
   readonly connectionStatusLabel = computed(() => this.connectionStatus().label);
   readonly connectionStatusAriaLabel = computed(() => `Realtime feed ${this.connectionStatus().ariaLabel}`);

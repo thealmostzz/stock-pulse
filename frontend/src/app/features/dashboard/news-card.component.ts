@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 
 import { NewsItem } from '../../core/models/news-item';
 
@@ -6,12 +6,21 @@ import { NewsItem } from '../../core/models/news-item';
   selector: 'sp-news-card',
   standalone: true,
   template: `
-    <article class="news-card" [class.news-card--new]="isNewest()" role="listitem" tabindex="0">
+    <article
+      class="news-card"
+      [class.news-card--new]="isNewest()"
+      [class.news-card--selected]="isSelected()"
+      role="button"
+      tabindex="0"
+      [attr.aria-pressed]="isSelected()"
+      (click)="activate()"
+      (keydown)="onKeydown($event)"
+    >
       <div class="news-card__meta">
         <span>{{ item().sourceCode }}</span>
         <time [attr.datetime]="item().publishedAtUtc">{{ publishedTime }}</time>
       </div>
-      <a class="news-card__title" [href]="item().url" target="_blank" rel="noopener noreferrer">{{ item().title }}</a>
+      <p class="news-card__title">{{ item().title }}</p>
       @if (item().summary) {
         <p class="news-card__summary">{{ item().summary }}</p>
       }
@@ -29,14 +38,15 @@ import { NewsItem } from '../../core/models/news-item';
     </article>
   `,
   styles: `
-    .news-card { height: 154px; overflow: hidden; padding: 1rem 1.5rem; border-bottom: 1px solid var(--sp-border); outline: none; }
+    .news-card { height: 154px; overflow: hidden; padding: 1rem 1.5rem; border-bottom: 1px solid var(--sp-border); outline: none; cursor: pointer; }
     .news-card:focus-visible { outline: 2px solid var(--sp-positive); outline-offset: -2px; }
+    .news-card--selected { background: color-mix(in srgb, var(--sp-positive) 9%, transparent); box-shadow: inset 3px 0 0 var(--sp-positive); }
     .news-card--new { animation: new-news 1.2s ease-out; }
     .news-card__meta, .news-card__footer, .news-card__signals, .news-card__tickers { display: flex; align-items: center; gap: .6rem; }
     .news-card__meta { color: var(--sp-muted); font-size: .67rem; letter-spacing: .08em; text-transform: uppercase; }
     time { margin-left: auto; letter-spacing: normal; text-transform: none; }
-    .news-card__title { display: block; margin: .45rem 0; color: var(--sp-text); font-size: .95rem; font-weight: 700; line-height: 1.4; text-decoration: none; }
-    .news-card__title:hover { color: var(--sp-positive); }
+    .news-card__title { display: block; margin: .45rem 0; color: var(--sp-text); font-size: .95rem; font-weight: 700; line-height: 1.4; }
+    .news-card:hover .news-card__title { color: var(--sp-positive); }
     .news-card__summary { display: -webkit-box; overflow: hidden; margin: 0 0 .75rem; color: var(--sp-muted); font-size: .78rem; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
     .news-card__footer { justify-content: space-between; font-size: .68rem; }
     .news-card__tickers span, .news-card__signals span { border: 1px solid var(--sp-border); border-radius: .25rem; padding: .19rem .35rem; }
@@ -53,6 +63,19 @@ import { NewsItem } from '../../core/models/news-item';
 export class NewsCardComponent {
   readonly item = input.required<NewsItem>();
   readonly isNewest = input(false);
+  readonly isSelected = input(false);
+  readonly newsSelected = output<NewsItem>();
+
+  activate(): void {
+    this.newsSelected.emit(this.item());
+  }
+
+  onKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      this.activate();
+    }
+  }
 
   get publishedTime(): string {
     return new Intl.DateTimeFormat('th-TH', { hour: '2-digit', minute: '2-digit' }).format(new Date(this.item().publishedAtUtc));

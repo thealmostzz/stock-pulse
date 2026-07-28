@@ -7,7 +7,13 @@
   </details>
 
   <section class="dashboard__feed" aria-label="Realtime news feed">
-    <sp-news-feed [items]="items()" [isLoading]="isLoading()" [connectionState]="connectionState()" />
+    <sp-news-feed
+      [items]="items()"
+      [isLoading]="isLoading()"
+      [connectionState]="connectionState()"
+      [selectedNewsId]="selectedNews()?.id ?? null"
+      (newsSelected)="selectNews($event)"
+    />
   </section>
 
   <aside class="dashboard__detail" aria-label="News inspector">
