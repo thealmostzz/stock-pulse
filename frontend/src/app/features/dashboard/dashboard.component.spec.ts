@@ -71,6 +71,15 @@ describe('DashboardComponent', () => {
     expect(component.items()[299].id).toBe(2);
   });
 
+  it('stores the news selected from the feed', () => {
+    const component = new DashboardComponent();
+    const news = createNews(99);
+
+    component.selectNews(news);
+
+    expect(component.selectedNews()).toBe(news);
+  });
+
   it('keeps hub news that arrives before the initial HTTP response', fakeAsync(() => {
     const initialNews = new Subject<NewsItem[]>();
     const hubEvents = new Subject<NewsCreatedEvent>();
