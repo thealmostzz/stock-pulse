@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { ScrollingModule } from '@angular/cdk/scrolling';
+import { HubConnectionState } from '@microsoft/signalr';
 
 import { NewsItem } from '../../core/models/news-item';
 import { NewsCardComponent } from './news-card.component';
@@ -15,7 +16,7 @@ import { NewsCardComponent } from './news-card.component';
           <p class="news-feed__eyebrow">LIVE INTELLIGENCE</p>
           <h1 id="news-feed-title">Market news</h1>
         </div>
-        <span class="news-feed__status" aria-label="Realtime feed connected">LIVE</span>
+        <span [class]="connectionStatusClass()" [attr.aria-label]="connectionStatusAriaLabel()">{{ connectionStatusLabel() }}</span>
       </header>
 
       @if (isLoading()) {
@@ -42,7 +43,9 @@ import { NewsCardComponent } from './news-card.component';
     .news-feed__header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.4rem 1.5rem 1.1rem; border-bottom: 1px solid var(--sp-border); }
     .news-feed__eyebrow { margin: 0 0 .3rem; color: var(--sp-muted); font-size: .65rem; font-weight: 700; letter-spacing: .13em; }
     h1 { margin: 0; font-size: 1.1rem; letter-spacing: -.03em; }
-    .news-feed__status { color: var(--sp-positive); font-size: .68rem; font-weight: 700; letter-spacing: .1em; }
+    .news-feed__status { color: var(--sp-muted); font-size: .68rem; font-weight: 700; letter-spacing: .1em; }
+    .news-feed__status--connected { color: var(--sp-positive); }
+    .news-feed__status--connecting, .news-feed__status--reconnecting { color: var(--sp-warning); }
     .news-feed__status::before { content: ''; display: inline-block; width: .45rem; height: .45rem; margin-right: .4rem; border-radius: 50%; background: currentColor; box-shadow: 0 0 .8rem currentColor; }
     .news-feed__viewport { height: 100%; }
     .news-feed__skeletons { padding: 1rem 1.5rem; }
@@ -56,9 +59,26 @@ import { NewsCardComponent } from './news-card.component';
 export class NewsFeedComponent {
   readonly items = input.required<NewsItem[]>();
   readonly isLoading = input(false);
+  readonly connectionState = input(HubConnectionState.Disconnected);
   readonly skeletonRows = [1, 2, 3, 4, 5, 6];
+  readonly connectionStatusLabel = computed(() => this.connectionStatus().label);
+  readonly connectionStatusAriaLabel = computed(() => `Realtime feed ${this.connectionStatus().ariaLabel}`);
+  readonly connectionStatusClass = computed(() => `news-feed__status news-feed__status--${this.connectionStatus().modifier}`);
 
   trackByNewsId(_: number, item: NewsItem): number {
     return item.id;
   }
+
+  private readonly connectionStatus = computed(() => {
+    switch (this.connectionState()) {
+      case HubConnectionState.Connected:
+        return { label: 'LIVE', ariaLabel: 'connected', modifier: 'connected' };
+      case HubConnectionState.Connecting:
+        return { label: 'CONNECTING', ariaLabel: 'connecting', modifier: 'connecting' };
+      case HubConnectionState.Reconnecting:
+        return { label: 'RECONNECTING', ariaLabel: 'reconnecting', modifier: 'reconnecting' };
+      default:
+        return { label: 'OFFLINE', ariaLabel: 'offline', modifier: 'offline' };
+    }
+  });
 }

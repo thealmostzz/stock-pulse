@@ -4,7 +4,7 @@
   </aside>
 
   <section class="dashboard__feed" aria-label="Realtime news feed">
-    <sp-news-feed [items]="items()" [isLoading]="isLoading()" />
+    <sp-news-feed [items]="items()" [isLoading]="isLoading()" [connectionState]="connectionState()" />
   </section>
 
   <aside class="dashboard__detail" aria-label="News inspector">

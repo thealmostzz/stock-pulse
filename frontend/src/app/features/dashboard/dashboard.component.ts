@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, Inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, DestroyRef, Inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { HubConnectionState } from '@microsoft/signalr';
 import { filter, finalize, bufferTime } from 'rxjs';
 
 import { NewsCreatedEvent, NewsItem } from '../../core/models/news-item';
@@ -24,6 +25,7 @@ export class DashboardComponent implements OnInit {
 
   readonly items = signal<NewsItem[]>([]);
   readonly isLoading = signal(true);
+  readonly connectionState = computed(() => this.newsHub?.connectionState() ?? HubConnectionState.Disconnected);
 
   constructor(
     @Inject(DestroyRef) private readonly destroyRef: DestroyRef | null = null,
@@ -42,7 +44,7 @@ export class DashboardComponent implements OnInit {
         takeUntilDestroyed(this.destroyRef),
         finalize(() => this.isLoading.set(false)),
       )
-      .subscribe((items) => this.items.set(items.slice(0, maxNewsItems)));
+      .subscribe((items) => this.mergeInitialItems(items));
 
     this.newsHub.newsCreated$
       .pipe(
@@ -52,7 +54,11 @@ export class DashboardComponent implements OnInit {
       )
       .subscribe((events) => this.prependEvents(events));
 
-    await this.newsHub.connect();
+    try {
+      await this.newsHub.connect();
+    } catch {
+      // NewsHubService exposes the disconnected state; keep the HTTP feed usable.
+    }
   }
 
   prependNews(news: NewsItem): void {
@@ -69,8 +75,39 @@ export class DashboardComponent implements OnInit {
       .map((event) => event.news);
 
     if (uniqueNews.length > 0) {
-      this.items.update((current) => [...uniqueNews, ...current].slice(0, maxNewsItems));
+      this.items.update((current) => this.mergeNews(uniqueNews, current));
     }
+  }
+
+  private mergeInitialItems(initialItems: NewsItem[]): void {
+    this.items.update((current) => this.mergeNews(current, initialItems));
+  }
+
+  private mergeNews(preferredItems: NewsItem[], remainingItems: NewsItem[]): NewsItem[] {
+    const seenNewsIds = new Set<number>();
+    const mergedItems: NewsItem[] = [];
+
+    if (this.appendUniqueItems(preferredItems, seenNewsIds, mergedItems)) {
+      return mergedItems;
+    }
+
+    this.appendUniqueItems(remainingItems, seenNewsIds, mergedItems);
+    return mergedItems;
+  }
+
+  private appendUniqueItems(items: NewsItem[], seenNewsIds: Set<number>, mergedItems: NewsItem[]): boolean {
+    for (const item of items) {
+      if (!seenNewsIds.has(item.id)) {
+        seenNewsIds.add(item.id);
+        mergedItems.push(item);
+      }
+
+      if (mergedItems.length === maxNewsItems) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   private rememberEventId(eventId: string): boolean {
