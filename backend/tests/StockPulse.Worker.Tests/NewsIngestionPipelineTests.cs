@@ -136,6 +136,40 @@ public sealed class NewsIngestionPipelineTests
     }
 
     [Fact]
+    public async Task IngestAsync_DiscardsInvalidProviderTickersFromNewsAndOutboxEvent()
+    {
+        var schemaName = $"worker_test_{Guid.NewGuid():N}";
+        await CreateSchemaAsync(schemaName);
+
+        try
+        {
+            await using var dbContext = await CreateSchemaDbContextAsync(schemaName);
+            var pipeline = new NewsIngestionPipeline(dbContext);
+            var article = new NormalizedNewsDto(
+                "mock",
+                "invalid-tickers-001",
+                "https://example.test/invalid-tickers",
+                "Ticker validation",
+                "Provider supplied invalid tickers.",
+                DateTimeOffset.UtcNow,
+                [" nvda ", "BRK/B", "BAD$", "NVDA"],
+                JsonDocument.Parse("{}"));
+
+            await pipeline.IngestAsync([article], CancellationToken.None);
+
+            var news = await dbContext.StockNews.Include(item => item.Tickers).SingleAsync();
+            var outboxMessage = (await dbContext.NewsOutboxEvents.SingleAsync()).Payload.Deserialize<NewsCreatedEvent>();
+            Assert.Equal(["NVDA"], news.Tickers.Select(ticker => ticker.Ticker));
+            Assert.Equal(["NVDA"], outboxMessage!.News.Tickers);
+            Assert.True(news.Tickers.Single().IsPrimary);
+        }
+        finally
+        {
+            await DropSchemaAsync(schemaName);
+        }
+    }
+
+    [Fact]
     public async Task DispatchPendingAsync_RetriesFailedEvent_AndMarksItDelivered()
     {
         var schemaName = $"worker_test_{Guid.NewGuid():N}";

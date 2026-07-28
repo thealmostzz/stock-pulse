@@ -4,6 +4,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using StockPulse.Application.DTOs;
+using StockPulse.Application.Services;
 using StockPulse.Contracts.News;
 using StockPulse.Domain.Entities;
 using StockPulse.Domain.Enums;
@@ -163,11 +164,22 @@ public sealed class NewsIngestionPipeline(
 
     private static StockNews CreateNews(NormalizedNewsDto article, short sourceId, string hash)
     {
-        var tickers = article.Tickers
-            .Select(ticker => ticker.Trim().ToUpperInvariant())
-            .Where(ticker => ticker.Length > 0)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
+        var tickers = new List<string>();
+        foreach (var providerTicker in article.Tickers)
+        {
+            try
+            {
+                var ticker = TickerNormalizer.Normalize(providerTicker);
+                if (!tickers.Contains(ticker, StringComparer.Ordinal))
+                {
+                    tickers.Add(ticker);
+                }
+            }
+            catch (ArgumentException)
+            {
+                // Provider ticker is malformed and must not reach persisted or realtime payloads.
+            }
+        }
         var news = new StockNews
         {
             SourceId = sourceId,
@@ -186,7 +198,7 @@ public sealed class NewsIngestionPipeline(
             Tags = []
         };
 
-        for (var index = 0; index < tickers.Length; index++)
+        for (var index = 0; index < tickers.Count; index++)
         {
             news.Tickers.Add(new StockNewsTicker
             {

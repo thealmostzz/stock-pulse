@@ -10,11 +10,26 @@ public sealed class SignalRRealtimePublisher(IHubContext<NewsHub> hubContext) : 
 {
     public async Task PublishNewsCreatedAsync(NewsCreatedEvent message, CancellationToken cancellationToken)
     {
+        var tickers = new List<string>();
+        foreach (var messageTicker in message.News.Tickers)
+        {
+            try
+            {
+                var ticker = TickerNormalizer.Normalize(messageTicker);
+                if (!tickers.Contains(ticker, StringComparer.Ordinal))
+                {
+                    tickers.Add(ticker);
+                }
+            }
+            catch (ArgumentException)
+            {
+                // Historical malformed ticker data must not block global realtime delivery.
+            }
+        }
+
         await hubContext.Clients.All.SendAsync("news:new", message, cancellationToken);
 
-        foreach (var ticker in message.News.Tickers
-                     .Select(TickerNormalizer.Normalize)
-                     .Distinct(StringComparer.Ordinal))
+        foreach (var ticker in tickers)
         {
             await hubContext.Clients.Group($"ticker:{ticker}").SendAsync("news:new", message, cancellationToken);
         }

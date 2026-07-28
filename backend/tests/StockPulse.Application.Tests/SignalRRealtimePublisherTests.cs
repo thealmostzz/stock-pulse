@@ -30,6 +30,26 @@ public sealed class SignalRRealtimePublisherTests
         Assert.Equal(["news:new", "news:new", "news:new"], client.MethodNames);
         Assert.All(client.Arguments, argument => Assert.Equal(eventId, Assert.IsType<NewsCreatedEvent>(argument).EventId));
     }
+
+    [Fact]
+    public async Task PublishNewsCreatedAsync_SkipsInvalidTickerGroupsAfterSendingGlobalEvent()
+    {
+        var client = new RecordingClientProxy();
+        var clients = DispatchProxy.Create<IHubClients, HubClientsProxy>();
+        ((HubClientsProxy)(object)clients).Client = client;
+        var hubContext = DispatchProxy.Create<IHubContext<NewsHub>, HubContextProxy>();
+        ((HubContextProxy)(object)hubContext).Clients = clients;
+        var publisher = new SignalRRealtimePublisher(hubContext);
+        var message = new NewsCreatedEvent(
+            Guid.NewGuid(),
+            DateTimeOffset.UtcNow,
+            new NewsResponseDto(1, "Title", null, "source", "https://example.test/news", DateTimeOffset.UtcNow, ["NVDA", "BRK/B", "BAD$"], "Neutral", 0m, []));
+
+        await publisher.PublishNewsCreatedAsync(message, CancellationToken.None);
+
+        Assert.Equal(["all", "ticker:NVDA"], ((HubClientsProxy)(object)clients).Targets);
+        Assert.Equal(["news:new", "news:new"], client.MethodNames);
+    }
 #pragma warning restore CA1707
 
     private sealed class RecordingClientProxy : IClientProxy
